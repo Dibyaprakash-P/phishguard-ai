@@ -1,0 +1,197 @@
+{
+  "model_name": "hybrid_ensemble",
+  "model_version": "1.0.0",
+  "trained_at": "2026-09-03T09:59:07+00:00",
+  "python_version": "3.10.0",
+  "feature_names": [
+    "url_length",
+    "hostname_length",
+    "path_length",
+    "query_length",
+    "fragment_length",
+    "tld_length",
+    "num_dots",
+    "num_hyphens",
+    "num_underscores",
+    "num_slashes",
+    "num_digits",
+    "num_letters",
+    "num_special_chars",
+    "num_equals",
+    "num_ampersands",
+    "num_question_marks",
+    "num_percent",
+    "num_at",
+    "num_hash",
+    "num_tilde",
+    "num_plus",
+    "num_commas",
+    "num_semicolons",
+    "digit_ratio",
+    "letter_ratio",
+    "special_char_ratio",
+    "host_digit_ratio",
+    "host_vowel_ratio",
+    "num_subdomains",
+    "path_depth",
+    "num_query_params",
+    "num_hyphens_in_host",
+    "num_digits_in_host",
+    "longest_host_token",
+    "avg_host_token_length",
+    "longest_path_token",
+    "max_char_repeat",
+    "url_entropy",
+    "domain_entropy",
+    "has_ip_host",
+    "has_port",
+    "has_at_symbol",
+    "has_double_slash_in_path",
+    "has_punycode",
+    "has_hex_escape",
+    "is_shortener",
+    "has_suspicious_tld",
+    "has_tld_in_subdomain",
+    "has_tld_in_path",
+    "num_suspicious_keywords",
+    "brand_outside_domain",
+    "num_brand_mentions"
+  ],
+  "feature_count": 52,
+  "decision_threshold": 0.6334893432675898,
+  "threshold_policy": "maximise recall subject to validation precision >= 0.97",
+  "label_mapping": {
+    "0": "legitimate",
+    "1": "phishing"
+  },
+  "hyperparameters": {
+    "members": "char_ngram_sgd + xgboost",
+    "voting": "soft",
+    "weights": "1:1",
+    "inputs": "numeric + char n-grams"
+  },
+  "dataset": {
+    "cleaning_report": {
+      "input_rows": 1447762,
+      "after_length_filter": 1447754,
+      "after_host_filter": 1447503,
+      "label_conflicts_removed": 195922,
+      "after_conflict_filter": 1251581,
+      "after_dedup": 851279,
+      "final_rows": 851279
+    },
+    "rows_per_source": {
+      "dataset_phishing": {
+        "0": 5709,
+        "1": 2891
+      },
+      "malicious_phish": {
+        "0": 380170,
+        "1": 160916
+      },
+      "phishing_site_urls": {
+        "0": 1,
+        "1": 66222
+      },
+      "phiusiil": {
+        "0": 134850,
+        "1": 100520
+      }
+    },
+    "sampled_rows": 500000,
+    "max_rows_cap": 500000,
+    "unique_domains": 198432,
+    "train_rows": 364953,
+    "val_rows": 67933,
+    "test_rows": 67114,
+    "train_phishing_rate": 0.5070844738911586,
+    "val_phishing_rate": 0.47919273401734064,
+    "test_phishing_rate": 0.4825371755520458,
+    "feature_count": 52,
+    "split_strategy": "GroupShuffle by registrable domain (no domain in two splits)"
+  },
+  "risk_bands": {
+    "low": [
+      0,
+      30
+    ],
+    "medium": [
+      31,
+      70
+    ],
+    "high": [
+      71,
+      100
+    ]
+  },
+  "top_features": [
+    {
+      "feature": "num_digits_in_host",
+      "importance": 0.157521
+    },
+    {
+      "feature": "has_suspicious_tld",
+      "importance": 0.141672
+    },
+    {
+      "feature": "num_suspicious_keywords",
+      "importance": 0.077904
+    },
+    {
+      "feature": "num_plus",
+      "importance": 0.050085
+    },
+    {
+      "feature": "num_ampersands",
+      "importance": 0.049977
+    },
+    {
+      "feature": "tld_length",
+      "importance": 0.048637
+    },
+    {
+      "feature": "brand_outside_domain",
+      "importance": 0.041426
+    },
+    {
+      "feature": "num_hyphens_in_host",
+      "importance": 0.031559
+    },
+    {
+      "feature": "num_dots",
+      "importance": 0.026519
+    },
+    {
+      "feature": "has_at_symbol",
+      "importance": 0.023827
+    },
+    {
+      "feature": "num_underscores",
+      "importance": 0.021194
+    },
+    {
+      "feature": "path_length",
+      "importance": 0.017972
+    },
+    {
+      "feature": "num_at",
+      "importance": 0.017254
+    },
+    {
+      "feature": "has_tld_in_path",
+      "importance": 0.016058
+    },
+    {
+      "feature": "has_hex_escape",
+      "importance": 0.015941
+    }
+  ],
+  "sanity_check": {
+    "note": "Hand-curated smoke test, not a benchmark. Reported separately from the held-out test metrics.",
+    "total": 40,
+    "correct": 39,
+    "accuracy": 0.975,
+    "legitimate_accuracy": 0.96,
+    "phishing_accuracy": 1.0
+  }
+}

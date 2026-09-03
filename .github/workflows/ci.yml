@@ -1,0 +1,215 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.11"
+  NODE_VERSION: "20"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Backend: lint + tests.
+  #
+  # No secrets are required. The suite ships a stub model and mocks the LLM
+  # chain, so it passes with no trained artifact and no API key — which is also
+  # the exact configuration a fresh clone starts in.
+  # ---------------------------------------------------------------------------
+  backend:
+    name: Backend (lint + tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install ruff
+
+      - name: Lint (ruff)
+        run: ruff check ml backend
+
+      - name: Check formatting
+        run: ruff format --check ml backend
+        continue-on-error: true
+
+      - name: Run tests
+        env:
+          LLM_PROVIDER: none
+        run: python -m pytest -v
+
+      - name: Verify the API boots without a model artifact
+        run: |
+          python - <<'PY'
+          from fastapi.testclient import TestClient
+          from backend.app.main import app
+
+          with TestClient(app) as client:
+              health = client.get("/api/health").json()
+              print("health:", health)
+              assert health["status"] in {"ok", "degraded"}
+
+              info = client.get("/api/model-info").json()
+              # With no artifact the API must say so rather than invent metrics.
+              if not info["trained"]:
+                  assert info["test_metrics"] is None
+                  assert info["message"]
+              print("model-info trained:", info["trained"])
+          PY
+
+  # ---------------------------------------------------------------------------
+  # Feature-extraction contract.
+  #
+  # The feature vector is the interface between training and serving. Reordering
+  # or renaming a feature without retraining would silently corrupt predictions,
+  # so the contract is asserted explicitly on every push.
+  # ---------------------------------------------------------------------------
+  contract:
+    name: Feature contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Assert the feature contract holds
+        run: |
+          python - <<'PY'
+          from ml.features import FEATURE_COUNT, FEATURE_NAMES, extract_features
+
+          assert len(set(FEATURE_NAMES)) == FEATURE_COUNT, "duplicate feature names"
+
+          # Provenance markers must never become model inputs again.
+          for banned in ("has_https", "has_www_prefix"):
+              assert banned not in FEATURE_NAMES, f"{banned} is a corpus artefact"
+
+          # Canonicalisation invariant: stylistic variants are indistinguishable.
+          assert extract_features("https://www.example.com") == extract_features(
+              "http://example.com"
+          ), "canonicalisation regression"
+
+          # Extraction must never raise, whatever it is handed.
+          for value in ("", "   ", "http://", "!!!", "http://[bad", "a" * 3000):
+              assert len(extract_features(value)) == FEATURE_COUNT
+
+          print(f"Feature contract OK: {FEATURE_COUNT} features")
+          PY
+
+  # ---------------------------------------------------------------------------
+  # Frontend: lint, tests, production build.
+  # ---------------------------------------------------------------------------
+  frontend:
+    name: Frontend (lint + build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        env:
+          VITE_API_URL: http://localhost:8000
+        run: npm run build
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------
+  # Docker images build cleanly. Not pushed anywhere — this only proves the
+  # Dockerfiles are valid and the build context is correct.
+  # ---------------------------------------------------------------------------
+  docker:
+    name: Docker build
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: backend/Dockerfile
+          push: false
+          tags: phishguard-api:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build web image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: frontend/Dockerfile
+          push: false
+          tags: phishguard-web:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ---------------------------------------------------------------------------
+  # Fails the build if a credential is ever committed.
+  # ---------------------------------------------------------------------------
+  secrets-scan:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Scan for committed credentials
+        run: |
+          set -e
+          if git ls-files | grep -E '(^|/)\.env$'; then
+            echo "::error::A .env file is committed. Remove it and rotate any exposed key."
+            exit 1
+          fi
+          # Real OpenAI/Azure keys, not the empty placeholders in .env.example.
+          if git grep -nE '(sk-[A-Za-z0-9]{20,}|AZURE_OPENAI_API_KEY=[A-Za-z0-9]{10,})' \
+               -- . ':(exclude).github/workflows/*'; then
+            echo "::error::A hardcoded API key was found in the repository."
+            exit 1
+          fi
+          echo "No committed credentials found."

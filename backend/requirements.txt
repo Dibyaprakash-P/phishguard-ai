@@ -1,0 +1,23 @@
+# ---------------------------------------------------------------------------
+# Runtime-only requirements for the PhishGuard AI API container.
+# MLflow and the training-only tooling are deliberately excluded to keep the
+# serving image small; inference needs sklearn/xgboost to deserialise the
+# model artifact, nothing more.
+# ---------------------------------------------------------------------------
+fastapi>=0.115.0,<1.0
+uvicorn[standard]>=0.30.0,<1.0
+pydantic>=2.9.0,<3.0
+pydantic-settings>=2.5.0,<3.0
+python-dotenv>=1.0.0
+
+numpy>=1.26.0,<2.0
+pandas>=2.2.0,<3.0
+scikit-learn>=1.5.0,<2.0
+xgboost>=2.1.0,<3.0
+joblib>=1.4.0
+
+# Optional: the API falls back to rule-based explanations when unavailable.
+langchain>=0.3.0
+langchain-core>=0.3.0
+langchain-openai>=0.2.0
+langgraph>=0.2.0

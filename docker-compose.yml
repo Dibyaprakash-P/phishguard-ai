@@ -1,0 +1,81 @@
+# =============================================================================
+# PhishGuard AI — local stack
+#
+#   docker compose up --build
+#     API  -> http://localhost:8000  (docs at /docs)
+#     Web  -> http://localhost:5173
+#
+# There is deliberately NO database service. The application is stateless:
+# model artifacts are files, configuration is environment variables, and scan
+# history lives only in the browser.
+#
+# Train the model before starting, or the API runs in a degraded state:
+#   python -m ml.train
+# =============================================================================
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    image: phishguard-api:latest
+    container_name: phishguard-api
+    ports:
+      - "8000:8000"
+    environment:
+      ENVIRONMENT: production
+      LOG_LEVEL: INFO
+      CORS_ORIGINS: "http://localhost:5173,http://localhost:4173,http://localhost"
+      # Supplied from the host .env when present; absent values simply mean the
+      # API serves rule-based explanations.
+      LLM_PROVIDER: ${LLM_PROVIDER:-none}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      AZURE_OPENAI_API_KEY: ${AZURE_OPENAI_API_KEY:-}
+      AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT:-}
+      AZURE_OPENAI_DEPLOYMENT: ${AZURE_OPENAI_DEPLOYMENT:-}
+      ENABLE_AGENT: ${ENABLE_AGENT:-false}
+    volumes:
+      # Mounted read-only so a retrain on the host is picked up by restarting
+      # the container, and the container can never modify the artifacts.
+      - ./models:/app/models:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+    image: phishguard-web:latest
+    container_name: phishguard-web
+    ports:
+      - "5173:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  # Optional experiment-tracking UI. Started only with:
+  #   docker compose --profile mlflow up
+  # Uses the local file store — no database, matching the project constraint.
+  mlflow:
+    image: python:3.11-slim
+    container_name: phishguard-mlflow
+    profiles: ["mlflow"]
+    working_dir: /workspace
+    environment:
+      MLFLOW_ALLOW_FILE_STORE: "true"
+    command: >
+      sh -c "pip install --no-cache-dir mlflow>=2.16.0 &&
+             mlflow ui --host 0.0.0.0 --port 5000
+             --backend-store-uri file:///workspace/mlruns"
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./mlruns:/workspace/mlruns

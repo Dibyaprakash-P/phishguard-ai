@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#03060f" />
+    <meta
+      name="description"
+      content="PhishGuard AI — detect phishing URLs with machine learning and AI-powered security reasoning. Static analysis only: submitted URLs are never visited."
+    />
+    <link rel="icon" type="image/svg+xml" href="/shield.svg" />
+    <link rel="preload" as="image" href="/assets/image.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!--
+      Typography system:
+        Orbitron      display face - geometric, squared, extended sci-fi/aerospace
+                      letterforms. Closest legally usable web font to the
+                      "ARTEMUS" reference wordmark, and it ships 400-900 so the
+                      hierarchy comes from real weights rather than CSS tricks.
+        Manrope       body face - clean geometric sans, highly readable at small
+                      sizes, complements Orbitron's geometry without competing.
+        JetBrains Mono monospace - URLs, hostnames and evidence strings, where
+                      character-level disambiguation matters for a security tool.
+    -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400..900&family=Manrope:wght@300..800&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <title>PhishGuard AI — Phishing URL Detection</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

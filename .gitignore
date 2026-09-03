@@ -1,0 +1,76 @@
+# ---------------------------------------------------------------------------
+# Secrets — never commit these.
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ---------------------------------------------------------------------------
+# Datasets and derived data.
+# Raw corpora are large and freely redistributable from their original sources
+# (see data/README.md), so they are not tracked here.
+# ---------------------------------------------------------------------------
+datasets/
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+*.csv
+*.arff
+*.parquet
+!backend/tests/**/*.csv
+
+# ---------------------------------------------------------------------------
+# ML artifacts.
+# models/ is intentionally NOT ignored: the .joblib plus its metadata are what
+# make a clone runnable. Use Git LFS if the artifact grows large.
+# ---------------------------------------------------------------------------
+mlruns/
+mlartifacts/
+mlflow.db
+*.log
+
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+.venv/
+venv/
+env/
+ENV/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# ---------------------------------------------------------------------------
+# Node / frontend
+# ---------------------------------------------------------------------------
+node_modules/
+frontend/dist/
+frontend/.vite/
+npm-debug.log*
+yarn-error.log*
+.eslintcache
+
+# ---------------------------------------------------------------------------
+# Editors / OS
+# ---------------------------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini

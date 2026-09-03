@@ -1,0 +1,313 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ==========================================================================
+   Design tokens
+   The supplied background art is the visual foundation: a dark navy field
+   with light streaks converging near the centre. Every surface below is
+   translucent so that artwork stays visible through the UI.
+   ========================================================================== */
+
+@layer base {
+  :root {
+    --glass-bg: 255 255 255 / 0.045;
+    --glass-border: 255 255 255 / 0.1;
+    --accent-rgb: 44 192 255;
+  }
+
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-ink-900 font-sans text-slate-200 antialiased;
+    /* The background element itself is fixed and painted by <AppBackground>;
+       this colour is only the fallback behind it. */
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow-x: hidden;
+  }
+
+  ::selection {
+    @apply bg-accent-400/30 text-white;
+  }
+
+  /* Slim, unobtrusive scrollbar that suits the dark theme. */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: rgb(3 6 15 / 0.6);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgb(255 255 255 / 0.12);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgb(var(--accent-rgb) / 0.35);
+    background-clip: content-box;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-accent-400/70 ring-offset-2 ring-offset-ink-900;
+  }
+}
+
+/* ==========================================================================
+   Component layer — the glass system
+   ========================================================================== */
+
+@layer components {
+  /* Base frosted panel. Deliberately low opacity so the artwork reads through;
+     the blur is what supplies legibility, not an opaque fill. */
+  .glass {
+    @apply rounded-2xl border border-white/10 bg-white/[0.045] shadow-glass backdrop-blur-xl;
+  }
+
+  .glass-strong {
+    @apply rounded-2xl border border-white/[0.12] shadow-glass backdrop-blur-2xl;
+    background: linear-gradient(
+      160deg,
+      rgb(255 255 255 / 0.075) 0%,
+      rgb(255 255 255 / 0.03) 45%,
+      rgb(10 17 34 / 0.35) 100%
+    );
+  }
+
+  .glass-hover {
+    @apply transition-all duration-300 ease-out;
+  }
+  .glass-hover:hover {
+    @apply -translate-y-0.5 border-white/20 bg-white/[0.075];
+    box-shadow:
+      0 12px 40px rgb(0 0 0 / 0.5),
+      0 0 24px rgb(var(--accent-rgb) / 0.14);
+  }
+
+  /* Hairline highlight along the top edge — the detail that makes a panel
+     read as glass rather than as a flat translucent rectangle. */
+  .glass-edge {
+    position: relative;
+  }
+  .glass-edge::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgb(255 255 255 / 0.28) 22%,
+      rgb(var(--accent-rgb) / 0.5) 50%,
+      rgb(255 255 255 / 0.28) 78%,
+      transparent
+    );
+    pointer-events: none;
+  }
+
+  .btn-primary {
+    @apply relative inline-flex items-center justify-center gap-2.5 rounded-xl px-7 py-3.5
+           font-display text-xs font-semibold uppercase text-white transition-all duration-300
+           disabled:cursor-not-allowed disabled:opacity-50;
+    letter-spacing: 0.1em;
+    background: linear-gradient(135deg, #0ea5e9 0%, #0369a1 100%);
+    box-shadow:
+      0 0 0 1px rgb(var(--accent-rgb) / 0.35) inset,
+      0 6px 20px rgb(3 105 161 / 0.4),
+      0 0 22px rgb(var(--accent-rgb) / 0.25);
+  }
+  .btn-primary:hover:not(:disabled) {
+    @apply -translate-y-0.5;
+    box-shadow:
+      0 0 0 1px rgb(var(--accent-rgb) / 0.5) inset,
+      0 10px 28px rgb(3 105 161 / 0.5),
+      0 0 38px rgb(var(--accent-rgb) / 0.42);
+  }
+  .btn-primary:active:not(:disabled) {
+    @apply translate-y-0;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-white/10
+           bg-white/[0.04] px-5 py-2.5 font-display text-[0.6875rem] font-medium uppercase
+           text-slate-300 backdrop-blur-md transition-all duration-200
+           hover:border-white/20 hover:bg-white/[0.08] hover:text-white;
+    letter-spacing: 0.1em;
+  }
+
+  /* ---------------------------------------------------------------- brand */
+
+  /* The wordmark carries the strongest display treatment: widest tracking
+     plus a restrained blue glow. The glow is a text-shadow rather than a
+     filter so the glyphs stay crisp and selectable. */
+  .brand-mark {
+    @apply font-display font-black uppercase leading-none text-white;
+    font-size: clamp(0.875rem, 1.5vw, 1rem);
+    letter-spacing: 0.2em;
+    margin-right: -0.2em; /* absorb the trailing tracking gap */
+    text-shadow:
+      0 0 18px rgb(var(--accent-rgb) / 0.35),
+      0 0 42px rgb(var(--accent-rgb) / 0.16);
+  }
+
+  .brand-sub {
+    @apply font-display font-semibold uppercase leading-none text-accent-300/85;
+    font-size: 0.5625rem;
+    letter-spacing: 0.38em;
+    margin-right: -0.38em;
+  }
+
+  /* ----------------------------------------------------------- navigation */
+
+  .nav-link {
+    @apply relative rounded-lg px-3.5 py-2 font-display text-[0.6875rem] font-medium
+           uppercase text-slate-400 transition-colors duration-200 hover:text-white;
+    letter-spacing: 0.14em;
+  }
+  .nav-link-active {
+    @apply text-white;
+  }
+  .nav-link-active::after {
+    content: '';
+    @apply absolute inset-x-3 -bottom-0.5 h-px;
+    background: linear-gradient(90deg, transparent, rgb(var(--accent-rgb)), transparent);
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-2 rounded-full border px-3.5 py-1
+           font-display text-[0.625rem] font-semibold uppercase;
+    letter-spacing: 0.16em;
+  }
+
+  .input-glass {
+    @apply w-full rounded-xl border border-white/10 bg-black/25 px-4 py-3.5
+           font-mono text-[15px] text-white placeholder-slate-500
+           backdrop-blur-md transition-all duration-200
+           focus:border-accent-400/60 focus:bg-black/35 focus:outline-none;
+  }
+  .input-glass:focus {
+    box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.14);
+  }
+
+  /* ======================================================================
+     Display typography
+     ----------------------------------------------------------------------
+     Orbitron is an extended geometric face. Two consequences drive
+     everything below:
+
+     1. Tracking is inversely scaled to size. Wide letterforms plus generous
+        tracking reads as deliberate at 12px and as broken at 60px, so large
+        display text gets LESS added spacing, not more.
+     2. Every size uses clamp(), because a tracked extended face at a fixed
+        px size is the single easiest way to overflow a phone viewport.
+     ====================================================================== */
+
+  .display-hero {
+    @apply font-display font-extrabold uppercase text-white;
+    font-size: clamp(1.75rem, 6.2vw, 3.75rem);
+    letter-spacing: 0.03em;
+    line-height: 1.14;
+    /* Tracking adds trailing space after the final glyph, which pushes
+       centred text visually left. Pull it back by one tracking unit. */
+    margin-right: -0.03em;
+  }
+
+  .display-heading {
+    @apply font-display font-bold uppercase text-white;
+    font-size: clamp(1.125rem, 2.6vw, 1.6rem);
+    letter-spacing: 0.06em;
+    line-height: 1.3;
+  }
+
+  /* Small all-caps section label, e.g. "EXTRACTED CHARACTERISTICS". */
+  .display-eyebrow {
+    @apply font-display font-semibold uppercase;
+    font-size: clamp(0.6875rem, 1.1vw, 0.8125rem);
+    letter-spacing: 0.16em;
+    line-height: 1.4;
+  }
+
+  /* Body-font caps label for dense card metadata, where Orbitron's width
+     would cause wrapping in a narrow column. */
+  .label-caps {
+    @apply font-sans text-[11px] font-bold uppercase text-slate-500;
+    letter-spacing: 0.14em;
+  }
+
+  /* Key figures: risk score, confidence, metric tiles. Orbitron's numerals
+     are geometric and even-width, which suits a readout. */
+  .stat-number {
+    @apply font-display font-bold text-white;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
+  }
+
+  .stat-number-lg {
+    @apply stat-number;
+    font-size: clamp(1.75rem, 4vw, 2.5rem);
+    line-height: 1;
+  }
+
+  .section-title {
+    @apply display-heading;
+    font-size: clamp(1.375rem, 3.4vw, 2rem);
+  }
+
+  .muted {
+    @apply text-sm leading-relaxed text-slate-400;
+  }
+
+  /* Thin gradient rule used to separate stacked sections. */
+  .divider {
+    @apply h-px w-full;
+    background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.12), transparent);
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(120deg, #ffffff 0%, #bfe6ff 42%, #2cc0ff 100%);
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .grid-fade-in > * {
+    animation: fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
+
+/* ==========================================================================
+   Accessibility — honour the OS "reduce motion" setting.
+   Animations here are decorative; none of them convey information that is
+   lost when they are disabled.
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .glass-hover:hover {
+    transform: none;
+  }
+}

@@ -1,0 +1,31 @@
+# ---------------------------------------------------------------------------
+# PhishGuard AI — full requirements (API + ML training pipeline)
+# For a slimmer runtime image see backend/requirements.txt.
+# ---------------------------------------------------------------------------
+
+# --- API -------------------------------------------------------------------
+fastapi>=0.115.0,<1.0
+uvicorn[standard]>=0.30.0,<1.0
+pydantic>=2.9.0,<3.0
+pydantic-settings>=2.5.0,<3.0
+python-dotenv>=1.0.0
+
+# --- ML --------------------------------------------------------------------
+numpy>=1.26.0,<2.0
+pandas>=2.2.0,<3.0
+scikit-learn>=1.5.0,<2.0
+xgboost>=2.1.0,<3.0
+joblib>=1.4.0
+
+# --- Experiment tracking ---------------------------------------------------
+mlflow>=2.16.0
+
+# --- LLM / GenAI (optional at runtime; the API works without credentials) --
+langchain>=0.3.0
+langchain-core>=0.3.0
+langchain-openai>=0.2.0
+langgraph>=0.2.0
+
+# --- Testing ---------------------------------------------------------------
+pytest>=8.0.0
+httpx>=0.27.0

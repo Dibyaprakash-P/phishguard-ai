@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "phishguard-ai"
+version = "1.0.0"
+description = "AI-powered phishing URL detection and security analyzer"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+
+[tool.setuptools]
+packages = ["ml", "backend"]
+
+[tool.pytest.ini_options]
+testpaths = ["backend/tests"]
+pythonpath = ["."]
+addopts = "-q --strict-markers --tb=short"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::UserWarning",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+exclude = ["frontend", "mlruns", "data", "datasets", "models", ".venv"]
+
+[tool.ruff.lint]
+# E501 (line length) is handled by the formatter; B008 is FastAPI's Depends idiom.
+select = ["E", "F", "W", "I", "B", "UP", "C4"]
+ignore = ["E501", "B008"]
+
+[tool.ruff.lint.per-file-ignores]
+"backend/tests/*" = ["B011"]
+# pydantic-settings on Python 3.10 cannot handle PEP 585 builtin generics in a
+# BaseSettings field (it calls issubclass() on them). Keep typing.List here.
+"backend/app/core/config.py" = ["UP006", "UP035"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["ml", "backend"]

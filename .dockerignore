@@ -1,0 +1,24 @@
+# Build context hygiene: never ship data, secrets or caches into an image.
+.git
+.github
+__pycache__
+**/__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+.venv
+venv
+env
+
+# Large corpora and derived data — the image only needs models/.
+datasets/
+data/raw/
+data/processed/
+mlruns/
+
+frontend/node_modules
+frontend/dist
+
+.env
+.env.local
+*.log
