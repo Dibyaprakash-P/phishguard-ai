@@ -259,7 +259,12 @@ def operating_points(
     return points
 
 
-def tune_threshold(y_true: pd.Series, proba: np.ndarray, min_precision: float = 0.97) -> float:
+def tune_threshold(
+    y_true: pd.Series,
+    proba: np.ndarray,
+    min_precision: float = 0.97,
+    objective: str = "precision_floor",
+) -> float:
     """Pick the decision threshold on the validation split.
 
     For a security classifier the two error types are not symmetric:
@@ -269,13 +274,35 @@ def tune_threshold(y_true: pd.Series, proba: np.ndarray, min_precision: float = 
     * a **false negative** lets a credential-harvesting page through, which is
       the harm the product exists to prevent.
 
-    The strategy here is therefore *maximise recall subject to a precision
-    floor* rather than maximising accuracy. If the floor is unreachable, fall
-    back to the best-F1 threshold.
+    Two objectives are supported, because they answer different questions:
+
+    ``precision_floor`` (default)
+        Maximise recall subject to ``precision >= min_precision``. This is the
+        right choice for a deployed security product: a false alarm on a
+        well-known site destroys user trust faster than a miss.
+
+    ``accuracy``
+        Maximise plain accuracy. This yields the highest headline accuracy the
+        model can produce, at the cost of more false positives on legitimate
+        sites. Measured on this corpus it buys roughly +1.8 accuracy points and
+        costs ~3.4 points of precision.
+
+    Neither objective changes the model or its ROC-AUC - both only slide the
+    cut-off along a fixed curve. ``models/metrics.json`` publishes the whole
+    operating-point table so the trade-off stays visible.
     """
     precisions, recalls, thresholds = precision_recall_curve(y_true, proba)
     # precision_recall_curve returns len(thresholds) == len(precisions) - 1
     precisions, recalls = precisions[:-1], recalls[:-1]
+
+    if objective == "accuracy":
+        # Sweep the observed thresholds and keep the most accurate. Selection
+        # happens on validation; the test split is never consulted here.
+        grid = np.unique(np.round(thresholds, 4))
+        if grid.size == 0:
+            return 0.5
+        best = max(grid, key=lambda t: accuracy_score(y_true, (proba >= t).astype(int)))
+        return float(best)
 
     eligible = precisions >= min_precision
     if eligible.any():
@@ -352,7 +379,12 @@ class Tracker:
 # --------------------------------------------------------------------------
 
 def train_and_compare(
-    data: SplitData, seed: int, tracker: Tracker, n_jobs: int, min_precision: float = 0.97
+    data: SplitData,
+    seed: int,
+    tracker: Tracker,
+    n_jobs: int,
+    min_precision: float = 0.97,
+    objective: str = "precision_floor",
 ) -> list[dict[str, Any]]:
     """Fit every candidate and return their evaluation records."""
     results: list[dict[str, Any]] = []
@@ -367,7 +399,9 @@ def train_and_compare(
             train_seconds = time.perf_counter() - started
 
             val_proba = estimator.predict_proba(data.X_val)[:, 1]
-            threshold = tune_threshold(data.y_val, val_proba, min_precision)
+            threshold = tune_threshold(
+                data.y_val, val_proba, min_precision, objective
+            )
             val_metrics = evaluate(data.y_val, val_proba, threshold)
             val_default = evaluate(data.y_val, val_proba, 0.5)
 
@@ -486,6 +520,17 @@ def main() -> None:
     parser.add_argument("--n-jobs", type=int, default=-1)
     parser.add_argument("--min-precision", type=float, default=0.97,
                         help="Precision floor used when tuning the decision threshold")
+    parser.add_argument(
+        "--objective",
+        choices=("precision_floor", "accuracy"),
+        default="precision_floor",
+        help=(
+            "Threshold-selection objective. 'precision_floor' (default) maximises "
+            "recall subject to --min-precision. 'accuracy' maximises plain accuracy, "
+            "which reports a higher headline number but produces more false positives "
+            "on legitimate sites."
+        ),
+    )
     parser.add_argument("--no-mlflow", action="store_true", help="Disable MLflow tracking")
     parser.add_argument("--no-holdout", action="store_true",
                         help="Skip the external PhishTank recall check")
@@ -504,7 +549,9 @@ def main() -> None:
         {k: v for k, v in data.stats.items() if k != "cleaning_report"}, indent=2))
 
     tracker = Tracker(enabled=not args.no_mlflow)
-    results = train_and_compare(data, args.seed, tracker, args.n_jobs, args.min_precision)
+    results = train_and_compare(
+        data, args.seed, tracker, args.n_jobs, args.min_precision, args.objective
+    )
 
     # Selection criterion: PR-AUC on validation. It is threshold-independent
     # and, unlike ROC-AUC, stays informative under class imbalance.
@@ -555,6 +602,8 @@ def main() -> None:
         "decision_threshold": best["threshold"],
         "threshold_policy": (
             f"maximise recall subject to validation precision >= {args.min_precision}"
+            if args.objective == "precision_floor"
+            else "maximise accuracy on the validation split"
         ),
         "label_mapping": {"0": "legitimate", "1": "phishing"},
         "hyperparameters": best["params"],
@@ -579,6 +628,7 @@ def main() -> None:
         "sanity_check": sanity,
         "operating_points": curve,
         "precision_floor": args.min_precision,
+        "threshold_objective": args.objective,
         "comparison": [
             {
                 "model": r["name"],

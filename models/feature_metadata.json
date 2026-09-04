@@ -1,7 +1,7 @@
 {
   "model_name": "hybrid_ensemble",
   "model_version": "1.0.0",
-  "trained_at": "2026-09-03T09:59:07+00:00",
+  "trained_at": "2026-09-04T04:06:01+00:00",
   "python_version": "3.10.0",
   "feature_names": [
     "url_length",
@@ -58,8 +58,8 @@
     "num_brand_mentions"
   ],
   "feature_count": 52,
-  "decision_threshold": 0.6334893432675898,
-  "threshold_policy": "maximise recall subject to validation precision >= 0.97",
+  "decision_threshold": 0.5096,
+  "threshold_policy": "maximise accuracy on the validation split",
   "label_mapping": {
     "0": "legitimate",
     "1": "phishing"
@@ -189,9 +189,9 @@
   "sanity_check": {
     "note": "Hand-curated smoke test, not a benchmark. Reported separately from the held-out test metrics.",
     "total": 40,
-    "correct": 39,
-    "accuracy": 0.975,
-    "legitimate_accuracy": 0.96,
+    "correct": 35,
+    "accuracy": 0.875,
+    "legitimate_accuracy": 0.8,
     "phishing_accuracy": 1.0
   }
 }

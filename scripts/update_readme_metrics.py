@@ -38,8 +38,8 @@ def render(metrics: dict, metadata: dict) -> str:
     lines: list[str] = []
     add = lines.append
 
-    add(f"All figures below are **measured**, not illustrative. They come from")
-    add(f"`models/metrics.json`, written by `python -m ml.train` on")
+    add("All figures below are **measured**, not illustrative. They come from")
+    add("`models/metrics.json`, written by `python -m ml.train` on")
     add(f"{metadata.get('trained_at', 'unknown date')}.")
     add("")
 

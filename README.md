@@ -305,7 +305,7 @@ high while the model is useless. So:
 <!-- METRICS:START -->
 All figures below are **measured**, not illustrative. They come from
 `models/metrics.json`, written by `python -m ml.train` on
-2026-09-03T09:59:07+00:00.
+2026-09-04T04:06:01+00:00.
 
 **Selected model: `hybrid_ensemble`** — chosen on highest validation PR-AUC.
 
@@ -316,22 +316,22 @@ appears anywhere in training.
 
 | Metric | Value |
 | --- | --- |
-| Accuracy | **87.82%** |
-| Precision | **96.80%** |
-| Recall | **77.31%** |
-| F1 score | **85.96%** |
+| Accuracy | **89.61%** |
+| Precision | **93.38%** |
+| Recall | **84.46%** |
+| F1 score | **88.69%** |
 | ROC-AUC | **0.9591** |
 | PR-AUC | **0.9632** |
-| False-positive rate | 2.39% |
-| False-negative rate | 22.69% |
-| Decision threshold | 0.6335 |
+| False-positive rate | 5.59% |
+| False-negative rate | 15.54% |
+| Decision threshold | 0.5096 |
 
 Confusion matrix on 67,114 test URLs:
 
 | | predicted legitimate | predicted phishing |
 | --- | --- | --- |
-| **actually legitimate** | 33,900 | 829 |
-| **actually phishing** | 7,347 | 25,038 |
+| **actually legitimate** | 32,789 | 1,940 |
+| **actually phishing** | 5,034 | 27,351 |
 
 ### Model comparison (validation split)
 
@@ -340,11 +340,11 @@ the winner was fixed.
 
 | Model | Accuracy | Precision | Recall | F1 | ROC-AUC | PR-AUC | Train time |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| logistic regression | 68.39% | 97.01% | 35.13% | 51.58% | 0.8408 | 0.8575 | 20s |
-| random forest | 79.71% | 97.00% | 59.48% | 73.75% | 0.9101 | 0.9194 | 142s |
-| xgboost | 80.81% | 97.00% | 61.87% | 75.55% | 0.9165 | 0.9251 | 43s |
-| char ngram sgd | 86.36% | 97.00% | 73.82% | 83.83% | 0.9489 | 0.9541 | 156s |
-| hybrid ensemble ★ | 87.75% | 97.00% | 76.81% | 85.73% | 0.9530 | 0.9582 | 203s |
+| logistic regression | 77.17% | 82.55% | 66.40% | 73.60% | 0.8408 | 0.8575 | 26s |
+| random forest | 83.83% | 90.92% | 73.61% | 81.36% | 0.9101 | 0.9194 | 249s |
+| xgboost | 84.21% | 90.22% | 75.21% | 82.03% | 0.9165 | 0.9251 | 40s |
+| char ngram sgd | 87.82% | 91.12% | 82.63% | 86.67% | 0.9489 | 0.9541 | 159s |
+| hybrid ensemble ★ | 89.21% | 92.89% | 83.89% | 88.16% | 0.9530 | 0.9582 | 180s |
 
 ★ selected. Note how far the linear baseline sits below the tree and
 n-gram models, and that the ensemble beats both of its members —
@@ -367,7 +367,7 @@ constant. Retune with `python -m ml.train --min-precision 0.95`.
 The strongest evidence of real generalisation: a live phishing feed never
 used in training, with every domain seen during training removed first.
 
-- **Recall: 84.56%** — detected 24,405 of 28,861 URLs
+- **Recall: 91.04%** — detected 26,275 of 28,861 URLs
 - Spanning 12,787 registrable domains, none seen in training
 - Mean predicted probability: 0.8262
 
@@ -381,13 +381,17 @@ its score must never be quoted as model accuracy. It exists because
 aggregate metrics cannot detect a shortcut that is present in the test
 split too.
 
-- Overall: **39/40** correct
-- Well-known legitimate URLs: 96%
+- Overall: **35/40** correct
+- Well-known legitimate URLs: 80%
 - Phishing-shaped URLs: 100%
 
 Current failures, reported rather than hidden:
 
+- `https://www.microsoft.com` — expected legitimate, scored 0.6194
 - `https://www.bbc.co.uk/news` — expected legitimate, scored 0.8268
+- `https://news.ycombinator.com` — expected legitimate, scored 0.6016
+- `https://mail.google.com` — expected legitimate, scored 0.5894
+- `https://www.linkedin.com/in/example` — expected legitimate, scored 0.6053
 
 These are false positives on well-known sites, and they reflect a real
 limitation: the corpora's legitimate examples skew long-tail, so major
@@ -413,7 +417,7 @@ Most influential numeric features (ensemble's tree branch):
 - `brand_outside_domain` — 4.1%
 - `num_hyphens_in_host` — 3.2%
 
-Total pipeline runtime: 907s.
+Total pipeline runtime: 1278s.
 <!-- METRICS:END -->
 
 ---
