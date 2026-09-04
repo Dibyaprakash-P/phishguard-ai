@@ -96,7 +96,7 @@ function FeatureImportance({ features }) {
   const max = Math.max(...features.map((f) => f.importance)) || 1
   return (
     <div className="glass p-5">
-      <h3 className="flex items-center gap-2 font-display text-[0.8125rem] font-bold uppercase tracking-[0.1em] text-white">
+      <h3 className="flex items-center gap-2 display-card-title">
         <BarChart3 className="h-4 w-4 text-accent-400" />
         Most influential features
       </h3>
@@ -139,7 +139,7 @@ function SanityGate({ sanity }) {
   return (
     <div className={`glass border-l-2 p-5 ${passed ? 'border-safe/40' : 'border-caution/50'}`}>
       <div className="flex items-start justify-between gap-4">
-        <h3 className="flex items-center gap-2 font-display text-[0.8125rem] font-bold uppercase tracking-[0.1em] text-white">
+        <h3 className="flex items-center gap-2 display-card-title">
           <ClipboardCheck className={`h-4 w-4 ${passed ? 'text-safe' : 'text-caution'}`} />
           Sanity gate
         </h3>
@@ -198,7 +198,7 @@ function OperatingPoints({ points, shippedFloor }) {
   if (!points?.length) return null
   return (
     <div className="glass p-5">
-      <h3 className="flex items-center gap-2 font-display text-[0.8125rem] font-bold uppercase tracking-[0.1em] text-white">
+      <h3 className="flex items-center gap-2 display-card-title">
         <SlidersHorizontal className="h-4 w-4 text-accent-400" />
         Operating points
       </h3>
@@ -288,7 +288,7 @@ export default function ModelPage() {
         <div className="glass-strong flex items-start gap-3 border border-danger/25 p-6">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-danger" />
           <div>
-            <h2 className="font-display text-[0.8125rem] font-bold uppercase tracking-[0.1em] text-white">Could not load model information</h2>
+            <h2 className="display-card-title">Could not load model information</h2>
             <p className="muted mt-1">{error}</p>
           </div>
         </div>
@@ -304,7 +304,7 @@ export default function ModelPage() {
           <span className="flex h-14 w-14 items-center justify-center rounded-2xl border border-caution/25 bg-caution/10">
             <AlertTriangle className="h-6 w-6 text-caution" />
           </span>
-          <h1 className="mt-5 font-display text-[0.875rem] font-bold uppercase tracking-[0.08em] text-white text-base">Model not trained</h1>
+          <h1 className="mt-5 display-panel-title">Model not trained</h1>
           <p className="muted mt-2 max-w-md">{info?.message}</p>
           <code className="mt-5 rounded-lg border border-white/10 bg-black/40 px-4 py-2.5 font-mono text-[13px] text-accent-200">
             python -m ml.train
@@ -406,7 +406,7 @@ export default function ModelPage() {
       {/* Decision policy + importances */}
       <section className="mt-8 grid gap-4 lg:grid-cols-2">
         <div className="glass p-5">
-          <h3 className="flex items-center gap-2 font-display text-[0.8125rem] font-bold uppercase tracking-[0.1em] text-white">
+          <h3 className="flex items-center gap-2 display-card-title">
             <Scale className="h-4 w-4 text-accent-400" />
             Decision policy
           </h3>
@@ -444,7 +444,7 @@ export default function ModelPage() {
       {/* Dataset provenance */}
       <section className="mt-4">
         <div className="glass p-5">
-          <h3 className="flex items-center gap-2 font-display text-[0.8125rem] font-bold uppercase tracking-[0.1em] text-white">
+          <h3 className="flex items-center gap-2 display-card-title">
             <Database className="h-4 w-4 text-accent-400" />
             Training data
           </h3>

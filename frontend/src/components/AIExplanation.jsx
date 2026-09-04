@@ -36,7 +36,7 @@ export default function AIExplanation({ explanation }) {
               )}
             </span>
             <div>
-              <h3 className="font-display text-[0.8125rem] font-bold uppercase tracking-[0.1em] text-white">
+              <h3 className="display-card-title">
                 {isLlm ? 'AI Security Analysis' : 'Rule-Based Security Analysis'}
               </h3>
               <p className="mt-0.5 text-[11px] text-slate-500">

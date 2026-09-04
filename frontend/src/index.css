@@ -235,11 +235,43 @@
     line-height: 1.4;
   }
 
-  /* Body-font caps label for dense card metadata, where Orbitron's width
-     would cause wrapping in a narrow column. */
+  /* Caps label for dense card metadata ("URL LENGTH", "RISK SCORE").
+     These sit directly above display-font figures, so keeping them in the body
+     face read as an inconsistency. Orbitron runs roughly 15% wider than
+     Manrope, so the size and tracking are pulled in to compensate and keep
+     short labels on one line in a narrow card. */
   .label-caps {
-    @apply font-sans text-[11px] font-bold uppercase text-slate-500;
-    letter-spacing: 0.14em;
+    @apply font-display text-[10px] font-semibold uppercase text-slate-500;
+    letter-spacing: 0.1em;
+    line-height: 1.4;
+  }
+
+  /* Title of an item in a list (an observed indicator, say). Display face but
+     NOT uppercased: these are sentence-length phrases, and uppercase Orbitron
+     at that length is slow to read and wraps badly on mobile. */
+  .display-item-title {
+    @apply font-display text-[0.8125rem] font-semibold text-white;
+    letter-spacing: 0.02em;
+    line-height: 1.4;
+  }
+
+  /* Title inside a glass card or panel. Sits one step below
+     .display-heading, and exists so the same treatment is not re-typed as an
+     inline utility string on every card. */
+  .display-card-title {
+    @apply font-display font-bold uppercase text-white;
+    font-size: 0.8125rem;
+    letter-spacing: 0.1em;
+    line-height: 1.35;
+  }
+
+  /* Title for a full-width panel or an empty/error state - slightly larger
+     than a card title, still well below a section heading. */
+  .display-panel-title {
+    @apply font-display font-bold uppercase text-white;
+    font-size: 0.9375rem;
+    letter-spacing: 0.08em;
+    line-height: 1.35;
   }
 
   /* Key figures: risk score, confidence, metric tiles. Orbitron's numerals

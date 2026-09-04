@@ -93,7 +93,24 @@ class Settings(BaseSettings):
     #: Set false to pin the boundary to ``phishing_threshold`` instead.
     use_model_threshold: bool = True
 
-    suspicious_threshold: float = 0.40
+    #: Lower bound of the "suspicious" band. Set from measurement, not taste:
+    #: on the held-out test split the band [0.40, threshold) was 60% LEGITIMATE,
+    #: so "suspicious" was firing on 6.87% of all legitimate URLs - including
+    #: bare well-known domains such as github.com (0.41) and google.com (0.45),
+    #: which carry almost no lexical signal and therefore sit near the model's
+    #: prior. At 0.48 the band is 52.6% legitimate / 47.4% phishing, i.e. the
+    #: region where the model genuinely cannot tell, which is what the label
+    #: should mean. That drops false "suspicious" on legitimate URLs to 1.51%.
+    #:
+    #: The cost is stated plainly: phishing URLs scoring below 0.48 now read
+    #: "legitimate" rather than "suspicious" (14.08% of phishing vs 10.66%
+    #: before). They were never flagged as phishing either way, and the numeric
+    #: risk score is always shown regardless of the band.
+    #:
+    #: An evidence-gated variant (require an observed indicator) was measured
+    #: and rejected: only 2.8% of phishing URLs in this band carry a
+    #: medium/high indicator, versus 9.9% of legitimate ones.
+    suspicious_threshold: float = 0.48
     phishing_threshold: float = 0.70
     risk_low_max: int = 30
     risk_medium_max: int = 70

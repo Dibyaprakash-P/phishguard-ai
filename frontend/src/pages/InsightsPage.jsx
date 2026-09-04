@@ -98,7 +98,7 @@ export default function InsightsPage({ history, onClear }) {
           <span className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
             <Database className="h-6 w-6 text-slate-500" />
           </span>
-          <h2 className="mt-5 font-display text-[0.875rem] font-bold uppercase tracking-[0.08em] text-white">No local scans yet</h2>
+          <h2 className="mt-5 display-panel-title">No local scans yet</h2>
           <p className="muted mt-2 max-w-md">
             Analyze a URL from the Scanner tab and its result will appear here. Nothing is
             sent anywhere or stored on the server.

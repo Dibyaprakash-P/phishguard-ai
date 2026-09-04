@@ -648,7 +648,7 @@ with no `.env` at all.
 | `AZURE_OPENAI_*` | – | Azure OpenAI key / endpoint / deployment |
 | `ENABLE_AGENT` | `false` | Exposes `/api/agent-analyze` |
 | `USE_MODEL_THRESHOLD` | `true` | Use the tuned operating point for the verdict |
-| `SUSPICIOUS_THRESHOLD` | `0.40` | Lower bound of the suspicious band |
+| `SUSPICIOUS_THRESHOLD` | `0.48` | Lower bound of the suspicious band |
 | `PHISHING_THRESHOLD` | `0.70` | Phishing boundary when not using the tuned one |
 | `MAX_URL_LENGTH` / `MAX_BATCH_SIZE` | `2048` / `25` | Request limits |
 | `CORS_ORIGINS` | localhost dev ports | Allowed browser origins |

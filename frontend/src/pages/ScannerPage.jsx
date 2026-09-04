@@ -34,7 +34,7 @@ export default function ScannerPage({ health, analysis, onAnalyze, onReset }) {
           >
             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-danger" />
             <div className="min-w-0 flex-1">
-              <h2 className="font-display text-[0.8125rem] font-bold uppercase tracking-[0.1em] text-white">Analysis failed</h2>
+              <h2 className="display-card-title">Analysis failed</h2>
               <p className="muted mt-1">{error.message}</p>
               {error.detail && (
                 <p className="mt-1 font-mono text-[11px] text-slate-600">{error.detail}</p>

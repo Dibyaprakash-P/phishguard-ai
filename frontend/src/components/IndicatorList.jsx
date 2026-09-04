@@ -47,7 +47,7 @@ export default function IndicatorList({ indicators }) {
                   <AlertTriangle className={`mt-0.5 h-4 w-4 shrink-0 ${tone.text}`} />
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h4 className="text-sm font-semibold text-white">{indicator.title}</h4>
+                      <h4 className="display-item-title">{indicator.title}</h4>
                       <span
                         className={`rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${tone.border} ${tone.bg} ${tone.text}`}
                       >

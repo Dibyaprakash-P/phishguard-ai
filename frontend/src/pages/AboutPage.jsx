@@ -39,7 +39,7 @@ function Card({ icon: Icon, title, children, tone = 'accent' }) {
       <span className={`flex h-10 w-10 items-center justify-center rounded-xl border ${toneClass}`}>
         <Icon className="h-5 w-5" strokeWidth={1.9} />
       </span>
-      <h3 className="mt-4 font-display text-[0.875rem] font-bold uppercase tracking-[0.08em] text-white">{title}</h3>
+      <h3 className="mt-4 display-panel-title">{title}</h3>
       <div className="muted mt-2 space-y-2">{children}</div>
     </article>
   )
@@ -69,7 +69,7 @@ export default function AboutPage() {
             <EyeOff className="h-5 w-5 text-safe" strokeWidth={1.9} />
           </span>
           <div>
-            <h2 className="font-display text-[0.875rem] font-bold uppercase tracking-[0.08em] text-white text-base">Privacy &amp; safety</h2>
+            <h2 className="display-panel-title">Privacy &amp; safety</h2>
             <p className="mt-2 text-[14px] font-medium leading-relaxed text-safe/90">
               The analyzer performs static URL analysis by default and does not automatically
               visit submitted websites.
@@ -118,7 +118,7 @@ export default function AboutPage() {
                 )}
               </div>
               <div className="min-w-0">
-                <h3 className="font-display text-[0.8125rem] font-bold uppercase tracking-[0.1em] text-white">
+                <h3 className="display-card-title">
                   <span className="mr-2 font-mono text-[11px] text-accent-400/70">
                     {String(index + 1).padStart(2, '0')}
                   </span>
@@ -194,7 +194,7 @@ export default function AboutPage() {
       {/* Limitations — stated plainly */}
       <section className="mt-10">
         <div className="glass border-l-2 border-caution/40 p-6">
-          <h2 className="font-display text-[0.875rem] font-bold uppercase tracking-[0.08em] text-white">Limitations</h2>
+          <h2 className="display-panel-title">Limitations</h2>
           <ul className="muted mt-3 list-disc space-y-2 pl-5">
             <li>
               A URL-only classifier cannot see page content. A phishing page hosted on a
