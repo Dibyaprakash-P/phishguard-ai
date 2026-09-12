@@ -170,17 +170,27 @@ Full diagrams, the train/serve-skew guards and the security posture table are in
 
 ## Quick start
 
-**Prerequisites:** Python 3.10+, Node 18+.
+**Prerequisites:** Python **3.10–3.12**, Node 18+.
+
+The upper bound is real. The committed model artifact is a scikit-learn 1.5.x
+pickle, and the pinned numpy 1.26.x ships no wheel past cp312, so 3.13+ cannot
+install the stack. If `python --version` says 3.13 or newer, create the
+environment against 3.12 — [uv](https://docs.astral.sh/uv/) will fetch it for
+you without touching your system Python:
+
+```bash
+uv venv --python 3.12 && uv pip install -r requirements.txt
+```
 
 ```bash
 # 1 — Install Python dependencies
 pip install -r requirements.txt
 
 # 2 — Place the datasets (see data/README.md) in ./datasets/
-#     Already present in this repository.
+#     Not tracked by git - fetch them with the commands in data/README.md.
 
-# 3 — Train. Takes roughly 15-20 minutes on a laptop.
-python -m ml.train
+# 3 — Train. Takes roughly 11 minutes on a laptop for the full 851k corpus.
+python -m ml.train --max-rows 0 --objective accuracy
 
 # 4 — Start the API              → http://localhost:8000/docs
 uvicorn backend.app.main:app --reload --port 8000

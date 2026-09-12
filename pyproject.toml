@@ -7,7 +7,12 @@ name = "phishguard-ai"
 version = "1.0.0"
 description = "AI-powered phishing URL detection and security analyzer"
 readme = "README.md"
-requires-python = ">=3.10"
+# Upper bound is real, not caution. The committed model artifact needs
+# scikit-learn 1.5.x to deserialise (see requirements.txt), and the pinned
+# numpy 1.26.x publishes no wheel past cp312 - so 3.13+ cannot install the
+# stack at all without building numpy from source. Verified end-to-end on
+# 3.12; CI runs 3.11.
+requires-python = ">=3.10,<3.13"
 license = { text = "MIT" }
 
 [tool.setuptools]

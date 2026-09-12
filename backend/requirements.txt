@@ -10,9 +10,21 @@ pydantic>=2.9.0,<3.0
 pydantic-settings>=2.5.0,<3.0
 python-dotenv>=1.0.0
 
+# --- ML ---------------------------------------------------------------------
+# scikit-learn is pinned to 1.5.x, not merely "<2.0", because the committed
+# model artifact is a pickle produced by 1.5.0 and pickles do not survive
+# scikit-learn's internal refactors:
+#
+#   1.5.0  loads          1.5.2  loads
+#   1.6.1  FAILS - sklearn.linear_model._sgd_fast.Log was renamed
+#   1.9.1  FAILS - sklearn.compose._column_transformer._RemainderColsList removed
+#
+# A range of ">=1.5.0,<2.0" resolves to the newest release, so a fresh install
+# would fetch 1.9.x and the API would refuse to start with a deserialisation
+# error. Widen this pin only together with a retrain.
 numpy>=1.26.0,<2.0
 pandas>=2.2.0,<3.0
-scikit-learn>=1.5.0,<2.0
+scikit-learn>=1.5,<1.6
 xgboost>=2.1.0,<3.0
 joblib>=1.4.0
 
