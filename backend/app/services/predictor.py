@@ -21,7 +21,7 @@ import pandas as pd
 from backend.app.core.config import settings
 from backend.app.core.exceptions import ModelNotAvailableError, PredictionError
 from backend.app.schemas.analysis import Prediction, RiskLevel
-from ml.features import FEATURE_NAMES, canonicalize_for_features
+from ml.features import FEATURE_NAMES, canonicalize_for_features, feature_fingerprint
 from ml.preprocess import MODEL_URL_COLUMN
 from ml.reputation import known_good_domain
 
@@ -84,6 +84,29 @@ class PhishingPredictor:
                 logger.error(self._load_error)
                 self._model = None
                 return False
+
+            # Matching names are not enough. Changing what a feature *computes*
+            # leaves every name identical while feeding the model numbers it
+            # never saw - which is how a fix to num_brand_mentions could quietly
+            # skew a model trained before it.
+            recorded = self._metadata.get("feature_fingerprint")
+            current = feature_fingerprint()
+            if recorded and recorded != current:
+                self._load_error = (
+                    "Feature extractor has changed since this model was trained "
+                    f"(recorded {recorded}, current {current}). The feature names still "
+                    "match, but at least one of them now computes a different value, so "
+                    "serving this artifact would feed the model inputs it never saw. "
+                    "Retrain with: python -m ml.train"
+                )
+                logger.error(self._load_error)
+                self._model = None
+                return False
+            if not recorded:
+                logger.warning(
+                    "Model metadata carries no feature_fingerprint, so the extractor "
+                    "cannot be verified against the artifact. Retrain to record one."
+                )
 
             logger.info(
                 "Loaded model '%s' v%s (%d features) in %.0f ms",

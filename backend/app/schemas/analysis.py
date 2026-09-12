@@ -255,7 +255,21 @@ class SanityFailure(BaseModel):
 
     url: str
     expected: int = Field(..., description="0 = legitimate, 1 = phishing")
-    probability: float
+    model_probability: float = Field(
+        ..., description="Raw classifier output, before any reputation rule."
+    )
+    served_probability: float = Field(
+        ..., description="What the user would see, after the reputation prior."
+    )
+
+
+class SanityGroup(BaseModel):
+    """One scored group of the curated set."""
+
+    total: int
+    label: int = Field(..., description="0 = the group is legitimate, 1 = phishing")
+    model_only_correct: int
+    as_served_correct: int
 
 
 class SanityCheck(BaseModel):
@@ -265,6 +279,10 @@ class SanityCheck(BaseModel):
     accuracy: the set is hand-written and deliberately easy. It exists to catch
     shortcuts that aggregate metrics cannot, because the shortcut is present in
     the test split too.
+
+    Scored twice throughout: ``model_only`` is the raw classifier, ``as_served``
+    includes the reputation prior. Both are published so that a reputation list
+    cannot mask a model regression behind a healthier-looking served number.
     """
 
     total: int
@@ -273,6 +291,12 @@ class SanityCheck(BaseModel):
     legitimate_accuracy: float
     phishing_accuracy: float
     note: str
+    model_only_accuracy: float | None = None
+    model_only_legitimate_accuracy: float | None = None
+    #: The number that matters most: legitimate URLs the reputation list does
+    #: not cover, so nothing shields the model on them.
+    unlisted_legitimate_accuracy: float | None = None
+    per_group: dict[str, SanityGroup] = Field(default_factory=dict)
     failures: list[SanityFailure] = Field(default_factory=list)
 
 

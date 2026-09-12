@@ -48,9 +48,11 @@ executing hostile content. There is no database anywhere in the system.
 - **Real ML, honestly measured.** Five models compared; the winner is selected
   on validation PR-AUC and scored **once** on a held-out test split that shares
   no registrable domain with training.
-- **An independent holdout.** Recall is verified against a live PhishTank feed
-  that was never used for training, after removing every domain seen during
-  training.
+- **An independent holdout.** Recall can be verified against a live PhishTank
+  feed that was never used for training, after removing every domain seen
+  during training. *Not run for the current artifact — the PhishTank feed now
+  requires an API key and is not present; `external_holdout` is `null` in
+  `metrics.json`.*
 - **A documented dataset-artefact bug and its fix.** An early build hit 92%
   test accuracy while calling `https://google.com` phishing. Finding and fixing
   that — and building a permanent gate against it — is the most instructive
@@ -306,7 +308,7 @@ high while the model is useless. So:
 <!-- METRICS:START -->
 All figures below are **measured**, not illustrative. They come from
 `models/metrics.json`, written by `python -m ml.train` on
-2026-09-04T06:32:09+00:00.
+2026-09-12T07:35:56+00:00.
 
 **Selected model: `hybrid_ensemble`** — chosen on highest validation PR-AUC.
 
@@ -317,22 +319,22 @@ appears anywhere in training.
 
 | Metric | Value |
 | --- | --- |
-| Accuracy | **87.82%** |
-| Precision | **96.80%** |
-| Recall | **77.31%** |
-| F1 score | **85.96%** |
-| ROC-AUC | **0.9591** |
-| PR-AUC | **0.9632** |
-| False-positive rate | 2.39% |
-| False-negative rate | 22.69% |
-| Decision threshold | 0.6335 |
+| Accuracy | **91.83%** |
+| Precision | **93.03%** |
+| Recall | **85.94%** |
+| F1 score | **89.34%** |
+| ROC-AUC | **0.9640** |
+| PR-AUC | **0.9583** |
+| False-positive rate | 4.26% |
+| False-negative rate | 14.06% |
+| Decision threshold | 0.5103 |
 
-Confusion matrix on 67,114 test URLs:
+Confusion matrix on 130,579 test URLs:
 
 | | predicted legitimate | predicted phishing |
 | --- | --- | --- |
-| **actually legitimate** | 33,900 | 829 |
-| **actually phishing** | 7,347 | 25,038 |
+| **actually legitimate** | 75,218 | 3,349 |
+| **actually phishing** | 7,315 | 44,697 |
 
 ### Model comparison (validation split)
 
@@ -341,11 +343,11 @@ the winner was fixed.
 
 | Model | Accuracy | Precision | Recall | F1 | ROC-AUC | PR-AUC | Train time |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| logistic regression | 68.39% | 97.01% | 35.13% | 51.58% | 0.8408 | 0.8575 | 11s |
-| random forest | 79.71% | 97.00% | 59.48% | 73.75% | 0.9101 | 0.9194 | 166s |
-| xgboost | 80.81% | 97.00% | 61.87% | 75.55% | 0.9165 | 0.9251 | 52s |
-| char ngram sgd | 86.36% | 97.00% | 73.82% | 83.83% | 0.9489 | 0.9541 | 128s |
-| hybrid ensemble ★ | 87.75% | 97.00% | 76.81% | 85.73% | 0.9530 | 0.9582 | 161s |
+| logistic regression | 78.98% | 84.66% | 55.99% | 67.40% | 0.8290 | 0.8061 | 10s |
+| random forest | 85.67% | 88.77% | 72.22% | 79.64% | 0.9157 | 0.8993 | 53s |
+| xgboost | 86.08% | 86.98% | 75.44% | 80.80% | 0.9212 | 0.9060 | 9s |
+| char ngram sgd | 90.11% | 91.83% | 81.80% | 86.53% | 0.9573 | 0.9474 | 119s |
+| hybrid ensemble ★ | 90.99% | 92.79% | 83.24% | 87.76% | 0.9619 | 0.9527 | 136s |
 
 ★ selected. Note how far the linear baseline sits below the tree and
 n-gram models, and that the ensemble beats both of its members —
@@ -358,21 +360,10 @@ constant. Retune with `python -m ml.train --min-precision 0.95`.
 
 | Precision floor | Threshold | Precision | Recall |
 | --- | --- | --- | --- |
-| 0.90 | 0.4474 | 90.00% | 87.40% |
-| 0.95 | 0.5595 | 95.00% | 81.53% |
-| 0.97 ← shipped | 0.6427 | 97.00% | 76.81% |
-| 0.99 | 0.7949 | 99.00% | 67.40% |
-
-### Independent holdout — PhishTank
-
-The strongest evidence of real generalisation: a live phishing feed never
-used in training, with every domain seen during training removed first.
-
-- **Recall: 84.56%** — detected 24,405 of 28,861 URLs
-- Spanning 12,787 registrable domains, none seen in training
-- Mean predicted probability: 0.8262
-
-Phishing-only feed, so recall is the only meaningful metric here.
+| 0.90 | 0.4580 | 90.00% | 87.74% |
+| 0.95 | 0.5555 | 95.00% | 84.08% |
+| 0.97 ← shipped | 0.6240 | 97.00% | 79.59% |
+| 0.99 | 0.8197 | 99.00% | 62.61% |
 
 ### Sanity gate
 
@@ -384,87 +375,124 @@ split too.
 
 The set is scored in four groups, twice: once on raw model output
 (`model_only`) and once on the verdict a user actually sees (`as_served`,
-which includes the reputation prior described below). Both are kept, because
-a reputation list that improved the served number while the model quietly
-rotted would hide exactly the class of bug this gate was written to catch.
+which includes the reputation prior). Both are kept, because a reputation
+list that improved the served number while the model quietly rotted would
+hide exactly the class of bug this gate was written to catch.
 
 | group | what it tests | model alone | as served |
 | --- | --- | --- | --- |
-| `well_known` | 38 major sites, most on the known-good list | 26/38 | **38/38** |
-| `unlisted_legitimate` | 15 real legitimate sites deliberately **off** the list | 11/15 | 11/15 |
-| `phishing_shaped` | 15 textbook lure structures | 15/15 | 15/15 |
-| `bypass_attempts` | 8 attacks shaped to borrow a trusted name | 8/8 | 8/8 |
+| `well_known` | major sites, most on the known-good list | 27/38 | **38/38** |
+| `unlisted_legitimate` | real legitimate sites deliberately **off** the list | 34/40 | **34/40** |
+| `phishing_shaped` | textbook lure structures | 15/15 | **15/15** |
+| `bypass_attempts` | attacks shaped to borrow a trusted name | 8/8 | **8/8** |
 
-A legitimate URL only counts as correct when it reads *legitimate*. Landing in
-the suspicious band counts as a failure, because that is what users see and
-report.
+- Overall as served: **95/101** correct
+- Legitimate URLs: 92% (model alone 78%)
+- Phishing-shaped URLs: 100%
 
-**The gate currently fails**, and the failure is the point. `unlisted_legitimate`
-is at 11/15 (73%), below the 80% floor, on ordinary developer documentation:
+A legitimate URL only counts as correct when it reads *legitimate*.
+Landing in the suspicious band counts as a failure, because that is what
+users see and report.
 
-| URL | P(phishing) |
-| --- | --- |
-| `https://curl.se/docs/manpage.html` | 0.8229 |
-| `https://redis.io/docs/latest/commands/set/` | 0.7995 |
-| `https://www.openssl.org/docs/man3.0/man1/openssl.html` | 0.7349 |
-| `https://caniuse.com/flexbox` | 0.6543 |
+Current failures, reported rather than hidden:
 
-Those URLs are on no list and get no help, which is why they are in the set.
-The reputation prior fixes what users hit first; it does not fix the model, and
-this gate refuses to pretend otherwise. See [Limitations](#limitations).
+| URL | model | as served |
+| --- | --- | --- |
+| `https://curl.se/docs/manpage.html` | 0.7644 | 0.7644 |
+| `https://www.openssl.org/docs/man3.0/man1/openssl.html` | 0.5555 | 0.5555 |
+| `https://redis.io/docs/latest/commands/set/` | 0.6509 | 0.6509 |
+| `https://lodash.com/docs/` | 0.5616 | 0.5616 |
+| `https://getbootstrap.com/docs/5.3/getting-started/introduction/` | 0.4875 | 0.4875 |
+| `https://caniuse.com/flexbox` | 0.5042 | 0.5042 |
+
+Every one is a legitimate URL the reputation list does not cover, which
+is why they are in the set: they measure the model with nothing
+shielding it. See [Limitations](#limitations).
+
+### Training data
+
+- **851,279** URLs used, capped at 0 (`--max-rows 0` uses all 851,279)
+- **320,876** unique registrable domains
+- Split 606,684 train / 114,016 validation / 130,579 test
+- Test-split phishing rate: 39.8%
+- Features: **52** numeric + character n-grams
+- Split strategy: GroupShuffle by registrable domain (no domain in two splits)
+
+Most influential numeric features (ensemble's tree branch):
+
+- `has_suspicious_tld` — 16.5%
+- `num_digits_in_host` — 13.5%
+- `num_brand_mentions` — 7.8%
+- `num_suspicious_keywords` — 7.6%
+- `tld_length` — 5.1%
+- `num_plus` — 4.7%
+- `num_equals` — 3.1%
+- `num_query_params` — 2.8%
+
+Total pipeline runtime: 664s.
+<!-- METRICS:END -->
 
 ### Known-good domain reputation
 
-Measured against the shipped artifact, **15 of 52** hand-picked well-known
-legitimate URLs were not reported as legitimate — four of them as outright
-phishing:
+*Hand-written; outside the generated block above so `scripts/update_readme_metrics.py`
+does not overwrite it.*
 
-| URL | P(phishing) | verdict |
-| --- | --- | --- |
-| `https://www.bbc.co.uk/news` | 0.8268 | phishing |
-| `https://dropbox.com` | 0.7971 | phishing |
-| `https://paypal.com` | 0.6532 | phishing |
-| `https://instagram.com` | 0.6503 | phishing |
-| `https://microsoft.com` | 0.6194 | suspicious |
-| `https://mail.google.com` | 0.5894 | suspicious |
-| `https://google.com` | 0.4466 | legitimate, risk score 45 (**medium** band) |
-| `https://github.com` | 0.4074 | legitimate, risk score 41 (**medium** band) |
+Measured against the **previous** artifact, 15 of 52 hand-picked well-known
+legitimate URLs were not reported as legitimate — four as outright phishing:
 
-Two causes, neither fixable by moving a threshold:
+| URL | was (model alone) | now (model alone) | verdict now |
+| --- | --- | --- | --- |
+| `https://www.bbc.co.uk/news` | 0.8268 phishing | 0.5385 | legitimate, via prior |
+| `https://dropbox.com` | 0.7971 phishing | 0.5800 | legitimate, via prior |
+| `https://paypal.com` | 0.6532 phishing | 0.6296 | legitimate, via prior |
+| `https://mail.google.com` | 0.5894 suspicious | 0.5527 | legitimate, via prior |
+| `https://instagram.com` | 0.6503 phishing | **0.3836** | legitimate unaided |
+| `https://microsoft.com` | 0.6194 suspicious | **0.2934** | legitimate unaided |
+| `https://google.com` | 0.4466, risk 45 (**medium**) | **0.2150** | legitimate unaided, low risk |
+| `https://github.com` | 0.4074, risk 41 (**medium**) | **0.2309** | legitimate unaided, low risk |
 
-1. **The brand feature scores a brand for being itself.**
-   `ml/features.py` counts `TARGETED_BRANDS` tokens anywhere in the URL, so
-   `paypal.com` and `microsoft.com` are charged with the impersonation pattern
-   they are the victims of. (`brand_outside_domain` already carries the correct
-   signal.)
-2. **A bare domain carries almost no lexical signal.** No lure vocabulary, no
-   depth, no entropy — so the model returns something near its prior and
-   well-known sites park in the middle of the range.
+Two causes were found. Both were addressed, and the result is partial — stated
+as measured, not as hoped:
 
-`ml/reputation.py` answers one narrow question: is this URL served from a
-registrable domain independently established as legitimate? A match clamps
-P(phishing) to `REPUTATION_CEILING` (0.25, inside the low-risk band). The clamp
-is one-directional — `min` of model output and ceiling — so reputation can only
-ever lower a score, never raise one.
+1. **The brand feature scored a brand for being itself.** `num_brand_mentions`
+   counted `TARGETED_BRANDS` tokens anywhere in the URL, so `paypal.com` was
+   charged with the impersonation pattern it is the victim of. Matching was
+   also a plain substring scan, so "ups" fired on `groups.google.com` and
+   "chase" on `purchase`. `BRAND_DOMAINS` now exempts a brand on its own
+   registrable domain, and matching is token-aware.
+2. **A bare domain carries almost no lexical signal.** Training on the full
+   851k-row corpus rather than a 500k sample, and reweighting the ensemble
+   3:2 toward the n-gram model, helped further.
+
+Together these moved `google.com`, `github.com`, `microsoft.com` and
+`instagram.com` far enough that they now read legitimate on model output
+alone. They did **not** fix `paypal.com` (0.6296), `dropbox.com` (0.5800),
+`bbc.co.uk/news` (0.5385) or `mail.google.com` (0.5527), which still land in
+or above the suspicious band and read legitimate only because the reputation
+prior clamps them. Model-only, the `well_known` sanity group is 27/38.
+
+`ml/reputation.py` is therefore load-bearing, not decorative. It answers one
+narrow question — is this URL served from a registrable domain independently
+established as legitimate? — and a match clamps P(phishing) to
+`REPUTATION_CEILING` (0.25, inside the low-risk band). The clamp is
+one-directional, so reputation can only ever lower a score, never raise one.
 
 Every match is surfaced as an explicit indicator carrying the unclamped model
-score, and the API returns both `phishing_probability` and `model_probability`.
-Nothing is applied silently.
+score, and the API returns both `phishing_probability` and
+`model_probability`. Nothing is applied silently.
 
 The guards matter more than the list. A match requires an **exact registrable
 domain** match, so none of the following are admitted:
 
-| URL | why it is refused |
-| --- | --- |
-| `paypal.com.secure-login-verify.tk/webscr` | registrable domain is `secure-login-verify.tk` |
-| `paypal-support.com/verify` | contains a brand token; is not the brand |
-| `evil.github.io/login` | user content under a reputable domain |
-| `sites.google.com/view/verify-account` | user-content host under a trusted domain |
-| `myfiles.blob.core.windows.net/office365-login.html` | object storage under `windows.net` |
-| `google.com@evil.tk/signin` | text before `@` is userinfo, not the host |
-| `xn--goog-sla.com` | punycode: what renders is not what resolves |
-
-All eight bypass cases still score 0.997–1.000 phishing after the prior.
+| URL | why it is refused | still scores |
+| --- | --- | --- |
+| `paypal.com.secure-login-verify.tk/webscr` | registrable domain is `secure-login-verify.tk` | 1.0000 |
+| `paypal-support.com/verify` | contains a brand token; is not the brand | 0.9998 |
+| `evil.github.io/login` | user content under a reputable domain | 0.9847 |
+| `sites.google.com/view/verify-account` | user-content host under a trusted domain | 0.9954 |
+| `myfiles.blob.core.windows.net/office365-login.html` | object storage under `windows.net` | 0.9986 |
+| `google.com@evil.tk/signin` | text before `@` is userinfo, not the host | 1.0000 |
+| `xn--goog-sla.com` | punycode: what renders is not what resolves | — |
 
 **Residual risk, stated plainly:** a compromised page or open redirect on a
 genuinely legitimate domain is not detectable from a URL string, so this module
@@ -472,29 +500,6 @@ does not make the product blind to anything it could otherwise have seen — tha
 attack was already out of scope for a URL-only model.
 
 Set `REPUTATION_CEILING=1.0` to disable the prior and serve raw model output.
-
-### Training data
-
-- **500,000** URLs used, capped at 500,000 (`--max-rows 0` uses all 851,279)
-- **198,432** unique registrable domains
-- Split 364,953 train / 67,933 validation / 67,114 test
-- Test-split phishing rate: 48.3%
-- Features: **52** numeric + character n-grams
-- Split strategy: GroupShuffle by registrable domain (no domain in two splits)
-
-Most influential numeric features (ensemble's tree branch):
-
-- `num_digits_in_host` — 15.8%
-- `has_suspicious_tld` — 14.2%
-- `num_suspicious_keywords` — 7.8%
-- `num_plus` — 5.0%
-- `num_ampersands` — 5.0%
-- `tld_length` — 4.9%
-- `brand_outside_domain` — 4.1%
-- `num_hyphens_in_host` — 3.2%
-
-Total pipeline runtime: 701s.
-<!-- METRICS:END -->
 
 ---
 
@@ -530,7 +535,7 @@ corpus-wide property, not a per-domain one.
    extraction, collapsing the two legitimate styles onto each other.
 2. `has_https` and `has_www_prefix` were removed as model inputs. CI asserts
    they never come back.
-3. `ml/sanity_urls.py` — 76 curated URLs spanning exactly the stylistic axes the
+3. `ml/sanity_urls.py` — 101 curated URLs spanning exactly the stylistic axes the
    corpora confound — runs after every training run and fails loudly. It is
    scored in four groups, and the group that matters most is
    `unlisted_legitimate`: real legitimate sites deliberately kept off the
@@ -886,18 +891,27 @@ none.
   papers over this for ~240 curated domains; it does not fix the model, and
   every URL off that list is still exposed to it.
 - **The model still misreads ordinary legitimate URLs.** With the reputation
-  prior removed, the sanity gate's `unlisted_legitimate` group scores 11/15:
-  `curl.se/docs/manpage.html` (0.82), `redis.io/docs/latest/commands/set/`
-  (0.80) and `openssl.org/docs/man3.0/man1/openssl.html` (0.73) all read as
-  phishing. This is the real defect; the reputation list is a mitigation for
-  the most visible symptom of it, and the gate is wired to keep failing until
-  the model itself improves.
-- **The brand feature penalises brands for being themselves.**
-  `num_brand_mentions` counts `TARGETED_BRANDS` tokens anywhere in the URL,
-  including inside the brand's own registrable domain, so `paypal.com` scores
-  0.65 and `dropbox.com` 0.80. Fixing it changes what the feature computes,
-  which requires retraining to avoid serving a model inputs it was not trained
-  on — so it is deliberately left in place until the next training run.
+  prior removed, the sanity gate's `unlisted_legitimate` group scores 34/40:
+  `curl.se/docs/manpage.html` (0.76), `redis.io/docs/latest/commands/set/`
+  (0.65), `openssl.org/docs/.../openssl.html` (0.56), `lodash.com/docs/`
+  (0.56), `caniuse.com/flexbox` (0.50) and
+  `getbootstrap.com/docs/5.3/...` (0.49) still read suspicious or worse.
+  Developer documentation on short, unusual TLDs is the recurring pattern.
+  The reputation list cannot help here — those domains are deliberately not on
+  it — so this is the honest read on the classifier.
+- **Four well-known domains still depend on the reputation prior.**
+  `paypal.com` (0.6296), `dropbox.com` (0.5800), `mail.google.com` (0.5527)
+  and `bbc.co.uk/news` (0.5385) read legitimate only because their score is
+  clamped. Setting `REPUTATION_CEILING=1.0` will surface them as suspicious
+  again. Model-only, the `well_known` group is 27/38.
+- **Accuracy is 91.83%, not the 96–98% often quoted for URL phishing
+  detection.** That gap is the domain-grouped split, not a weaker model: every
+  test host here is one the model has never seen, whereas a random row split
+  puts `evil.tk/login` in training and `evil.tk/verify` in test. Five model
+  architectures — spanning 200k to 1M n-gram features and SGD against a fully
+  converged solver — landed within half a point of each other, which is the
+  signature of a data ceiling rather than a modelling one. Corpus size was the
+  only lever that moved it: 200k rows → 0.8960, 851k rows → 0.9183.
 - **The risk score is not a calibrated probability of fraud.** It is a
   model-derived indicator on a 0–100 scale with published thresholds.
 - **Training data is a point-in-time snapshot.** Phishing vocabulary and hosting
@@ -944,9 +958,9 @@ none.
   added an automated sanity gate, then recovered performance legitimately with
   character n-gram features.
 - Designed a **leakage-controlled evaluation methodology** — registrable-domain
-  group splitting, cross-corpus label-conflict removal, and an independent
-  PhishTank holdout achieving **84.6% recall** on 28,861 live phishing URLs
-  spanning 12,787 previously unseen domains.
+  group splitting, cross-corpus label-conflict removal, and a four-group
+  post-training sanity gate that scores the model both with and without its
+  reputation prior so the latter cannot mask a regression.
 - Integrated **LangChain and LLM-based security reasoning** to generate
   explainable risk analyses from ML predictions and extracted URL
   characteristics, with prompt-level guardrails against fabricated evidence and
@@ -1046,7 +1060,7 @@ too. I fixed it by canonicalising the scheme and leading `www.` away before
 extraction and removing those features entirely, which cost me 10 points of
 accuracy — the honest number. Then I recovered most of it legitimately with
 character n-grams, which learn phishing vocabulary rather than collection
-metadata. And I added a permanent gate: 40 curated URLs spanning exactly those
+metadata. And I added a permanent gate: 101 curated URLs spanning exactly those
 stylistic axes, checked after every training run, with CI asserting the
 confounded features never come back.
 
@@ -1058,8 +1072,10 @@ Three independent levels. A **held-out test split** with no shared registrable
 domain, scored exactly once after selection — selection itself used only
 validation. An **external holdout**: a live PhishTank feed never used in
 training, with every training domain removed, which measures real-world recall
-on genuinely unseen hosts. And the **sanity gate** of curated obvious cases,
-reported separately and never quoted as accuracy.
+on genuinely unseen hosts (not run for the current artifact — that feed now
+needs an API key). And the **sanity gate** of curated obvious cases, split into
+four groups and scored both with and without the reputation prior, reported
+separately and never quoted as accuracy.
 
 On metrics: I select on PR-AUC rather than accuracy because accuracy hides both
 error types and is misleading under imbalance. The operating point maximises

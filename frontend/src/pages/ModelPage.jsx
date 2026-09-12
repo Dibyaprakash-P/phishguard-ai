@@ -133,9 +133,22 @@ function FeatureImportance({ features }) {
  * what catches that class of bug. It is labelled as a smoke test so it is never
  * read as model accuracy.
  */
+const GROUP_LABELS = {
+  well_known: 'Well-known sites',
+  unlisted_legitimate: 'Legitimate, not on the list',
+  phishing_shaped: 'Phishing-shaped',
+  bypass_attempts: 'Bypass attempts',
+}
+
 function SanityGate({ sanity }) {
   if (!sanity) return null
-  const passed = sanity.legitimate_accuracy >= 0.8
+  // The gate is judged on legitimate URLs the reputation list does NOT cover.
+  // Judging it on the served number would let the list hide a model regression,
+  // which is the one thing this gate exists to prevent.
+  const unaided = sanity.unlisted_legitimate_accuracy
+  const passed = (unaided ?? sanity.legitimate_accuracy) >= 0.8
+  const groups = Object.entries(sanity.per_group ?? {})
+
   return (
     <div className={`glass border-l-2 p-5 ${passed ? 'border-safe/40' : 'border-caution/50'}`}>
       <div className="flex items-start justify-between gap-4">
@@ -150,20 +163,38 @@ function SanityGate({ sanity }) {
 
       <p className="muted mt-2">{sanity.note}</p>
 
-      <dl className="mt-4 grid grid-cols-2 gap-3 text-[13px]">
-        <div>
-          <dt className="text-slate-500">Known legitimate</dt>
-          <dd className="mt-0.5 font-semibold tabular-nums text-white">
-            {percent(sanity.legitimate_accuracy, 0)}
-          </dd>
+      {groups.length > 0 && (
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full text-left text-[12px]">
+            <thead>
+              <tr className="text-[10px] uppercase tracking-wider text-slate-500">
+                <th className="pb-1.5 font-medium">Group</th>
+                <th className="pb-1.5 text-right font-medium">Model alone</th>
+                <th className="pb-1.5 text-right font-medium">As served</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {groups.map(([name, g]) => (
+                <tr key={name}>
+                  <td className="py-1.5 text-slate-400">{GROUP_LABELS[name] ?? name}</td>
+                  <td className="py-1.5 text-right tabular-nums text-slate-400">
+                    {g.model_only_correct}/{g.total}
+                  </td>
+                  <td className="py-1.5 text-right font-semibold tabular-nums text-white">
+                    {g.as_served_correct}/{g.total}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-        <div>
-          <dt className="text-slate-500">Phishing-shaped</dt>
-          <dd className="mt-0.5 font-semibold tabular-nums text-white">
-            {percent(sanity.phishing_accuracy, 0)}
-          </dd>
-        </div>
-      </dl>
+      )}
+
+      <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
+        &ldquo;As served&rdquo; includes the known-good domain prior; &ldquo;model alone&rdquo;
+        does not. Both are published so the curated list cannot mask a model
+        regression behind a healthier served number.
+      </p>
 
       {sanity.failures?.length > 0 && (
         <div className="mt-4 border-t border-white/10 pt-3">
@@ -177,15 +208,15 @@ function SanityGate({ sanity }) {
                   {failure.url}
                 </span>
                 <span className="shrink-0 text-[11px] tabular-nums text-caution">
-                  {failure.probability.toFixed(3)}
+                  {failure.model_probability.toFixed(3)}
                 </span>
               </li>
             ))}
           </ul>
           <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
-            These are false positives on well-known sites. They are reported rather than
-            hidden: the training corpora&apos;s legitimate examples skew long-tail, so major
-            brand domains are under-represented.
+            Every one is a legitimate URL the curated list does not cover, which is why
+            it is in the set: these measure the classifier with nothing shielding it.
+            Reported rather than hidden.
           </p>
         </div>
       )}

@@ -117,3 +117,91 @@ class TestPredictorService:
         loaded_predictor._model = Broken()
         with pytest.raises(PredictionError):
             loaded_predictor.predict_one(extract("https://a.com"), "https://a.com")
+
+
+class TestFeatureFingerprint:
+    """The artifact must not be served by a changed feature extractor.
+
+    `feature_names` matching proves the *columns* line up. It says nothing
+    about whether a column still computes the same thing. Fixing
+    `num_brand_mentions` so that `paypal.com` stopped counting as PayPal
+    impersonation changed every brand-bearing feature vector while leaving all
+    52 names identical — a model trained before that change would have been
+    served inputs it never saw, with no error anywhere.
+    """
+
+    def test_fingerprint_is_deterministic(self):
+        from ml.features import feature_fingerprint
+
+        assert feature_fingerprint() == feature_fingerprint()
+
+    def test_fingerprint_changes_when_a_feature_changes(self, monkeypatch):
+        import ml.features as features
+
+        before = features.feature_fingerprint()
+        # Loosening the brand affix rule to 5 makes "chase" match inside
+        # "purchase" again - one probe's num_brand_mentions goes 0 -> 1 while
+        # all 52 feature names stay identical. That is precisely the change the
+        # name-only contract check cannot see.
+        monkeypatch.setattr(features, "_BRAND_AFFIX_MIN_LENGTH", 5)
+        assert features.feature_fingerprint() != before
+
+    def test_fingerprint_covers_keyword_changes_too(self, monkeypatch):
+        import ml.features as features
+
+        before = features.feature_fingerprint()
+        monkeypatch.setattr(features, "SUSPICIOUS_KEYWORDS", ())
+        assert features.feature_fingerprint() != before
+
+    def test_load_refuses_a_stale_fingerprint(self, tmp_path, monkeypatch, stub_model):
+        import json
+
+        import joblib
+
+        from backend.app.core.config import settings
+        from backend.app.services.predictor import PhishingPredictor
+        from ml.features import FEATURE_NAMES
+
+        model_path = tmp_path / "model.joblib"
+        joblib.dump(stub_model, model_path)
+        metadata = tmp_path / "meta.json"
+        metadata.write_text(json.dumps({
+            "model_name": "stub",
+            "feature_names": list(FEATURE_NAMES),
+            "feature_fingerprint": "0" * 32,   # not what the extractor produces
+        }), encoding="utf-8")
+
+        monkeypatch.setattr(settings, "model_path", str(model_path))
+        monkeypatch.setattr(settings, "feature_metadata_path", str(metadata))
+        monkeypatch.setattr(settings, "metrics_path", str(tmp_path / "missing.json"))
+
+        predictor = PhishingPredictor()
+        assert predictor.load() is False
+        assert not predictor.is_loaded
+        assert "Feature extractor has changed" in (predictor.load_error or "")
+
+    def test_load_accepts_a_matching_fingerprint(self, tmp_path, monkeypatch, stub_model):
+        import json
+
+        import joblib
+
+        from backend.app.core.config import settings
+        from backend.app.services.predictor import PhishingPredictor
+        from ml.features import FEATURE_NAMES, feature_fingerprint
+
+        model_path = tmp_path / "model.joblib"
+        joblib.dump(stub_model, model_path)
+        metadata = tmp_path / "meta.json"
+        metadata.write_text(json.dumps({
+            "model_name": "stub",
+            "feature_names": list(FEATURE_NAMES),
+            "feature_fingerprint": feature_fingerprint(),
+        }), encoding="utf-8")
+
+        monkeypatch.setattr(settings, "model_path", str(model_path))
+        monkeypatch.setattr(settings, "feature_metadata_path", str(metadata))
+        monkeypatch.setattr(settings, "metrics_path", str(tmp_path / "missing.json"))
+
+        predictor = PhishingPredictor()
+        assert predictor.load() is True
+        assert predictor.is_loaded

@@ -49,6 +49,72 @@ TARGETED_BRANDS: tuple[str, ...] = (
     "fedex", "ups", "usps", "irs", "hmrc", "icloud", "yahoo", "twitter",
 )
 
+#: The registrable domains each brand legitimately operates from.
+#:
+#: Without this, a brand token counts as an impersonation signal even when the
+#: URL *is* the brand: measured on the shipped artifact, ``paypal.com`` scored
+#: 0.6532 and ``dropbox.com`` 0.7971 - both above the phishing threshold -
+#: because ``num_brand_mentions`` fired on their own apex domain. The brand is
+#: the victim of that pattern, not an instance of it.
+#:
+#: Only domains that genuinely belong to the brand go here. This is not a
+#: trust list: it exempts a brand token from being counted against its own
+#: domain and nothing more. Serving-time reputation is a separate, more
+#: heavily guarded decision in :mod:`ml.reputation`.
+BRAND_DOMAINS: dict[str, frozenset[str]] = {
+    "paypal": frozenset({"paypal.com"}),
+    "apple": frozenset({"apple.com", "icloud.com"}),
+    "microsoft": frozenset({"microsoft.com", "live.com", "office.com", "msn.com"}),
+    "office365": frozenset({"office365.com", "office.com", "microsoft.com"}),
+    "outlook": frozenset({"outlook.com", "live.com", "microsoft.com"}),
+    "google": frozenset({"google.com", "google.co.uk", "google.de", "google.fr",
+                         "google.co.in", "youtube.com"}),
+    "gmail": frozenset({"gmail.com", "google.com"}),
+    "amazon": frozenset({"amazon.com", "amazon.co.uk", "amazon.de", "amazon.in"}),
+    "netflix": frozenset({"netflix.com"}),
+    "facebook": frozenset({"facebook.com", "meta.com"}),
+    "instagram": frozenset({"instagram.com"}),
+    "whatsapp": frozenset({"whatsapp.com"}),
+    "linkedin": frozenset({"linkedin.com"}),
+    "dropbox": frozenset({"dropbox.com"}),
+    "docusign": frozenset({"docusign.com", "docusign.net"}),
+    "adobe": frozenset({"adobe.com"}),
+    "chase": frozenset({"chase.com"}),
+    "wellsfargo": frozenset({"wellsfargo.com"}),
+    "bankofamerica": frozenset({"bankofamerica.com"}),
+    "citibank": frozenset({"citibank.com", "citi.com"}),
+    "hsbc": frozenset({"hsbc.com", "hsbc.co.uk"}),
+    "barclays": frozenset({"barclays.co.uk", "barclays.com"}),
+    "santander": frozenset({"santander.co.uk", "santander.com"}),
+    "coinbase": frozenset({"coinbase.com"}),
+    "binance": frozenset({"binance.com"}),
+    "metamask": frozenset({"metamask.io"}),
+    "blockchain": frozenset({"blockchain.com"}),
+    "steam": frozenset({"steampowered.com", "steamcommunity.com"}),
+    "roblox": frozenset({"roblox.com"}),
+    "ebay": frozenset({"ebay.com", "ebay.co.uk"}),
+    "alibaba": frozenset({"alibaba.com", "aliexpress.com"}),
+    "dhl": frozenset({"dhl.com"}),
+    "fedex": frozenset({"fedex.com"}),
+    "ups": frozenset({"ups.com"}),
+    "usps": frozenset({"usps.com"}),
+    "irs": frozenset({"irs.gov"}),
+    "hmrc": frozenset({"hmrc.gov.uk"}),
+    "icloud": frozenset({"icloud.com", "apple.com"}),
+    "yahoo": frozenset({"yahoo.com"}),
+    "twitter": frozenset({"twitter.com", "x.com"}),
+}
+
+#: Shortest brand that may match as part of a longer token. Below this length,
+#: only a whole-token match counts.
+#:
+#: Plain substring matching - what this module did originally - fires "ups" on
+#: ``groups.google.com`` and "chase" on ``purchase``, which is noise dressed up
+#: as an impersonation signal. Requiring a token boundary removes it. Six is
+#: where the affix rule stops colliding with ordinary English: at five,
+#: ``purchase`` still ends with "chase".
+_BRAND_AFFIX_MIN_LENGTH: int = 6
+
 #: Known URL-shortening services. Shorteners hide the true destination.
 SHORTENER_DOMAINS: tuple[str, ...] = (
     "bit.ly", "goo.gl", "tinyurl.com", "t.co", "ow.ly", "is.gd", "buff.ly",
@@ -186,6 +252,36 @@ def _max_consecutive_repeat(text: str) -> int:
         if current > best:
             best = current
     return best
+
+
+def _brand_matches(text: str) -> set[str]:
+    """Return the targeted brands referenced in ``text``, token-aware.
+
+    A brand counts when it is a whole token (``paypal`` in
+    ``paypal-secure-login``, which splits to ``[paypal, secure, login]``), or
+    when it prefixes or suffixes a longer token (``paypalsecure``) and is long
+    enough that doing so is not an accident.
+
+    The affix rule is length-gated because short brands collide with ordinary
+    words: without the gate, "ups" fires on ``groups.google.com`` and "chase"
+    on ``purchase``. Those matches were pure noise in a feature that is meant
+    to signal impersonation.
+    """
+    tokens = [t for t in _WORD_SPLIT_RE.split(text.lower()) if t]
+    matched: set[str] = set()
+    for token in tokens:
+        for brand in TARGETED_BRANDS:
+            if brand in matched:
+                continue
+            if token == brand:
+                matched.add(brand)
+            elif (
+                len(brand) >= _BRAND_AFFIX_MIN_LENGTH
+                and len(token) > len(brand)
+                and (token.startswith(brand) or token.endswith(brand))
+            ):
+                matched.add(brand)
+    return matched
 
 
 def canonicalize_for_features(url: str) -> str:
@@ -353,11 +449,22 @@ def extract_features(url: str) -> dict[str, float]:
 
     is_ip = _is_ip_host(host)
     keyword_hits = sum(1 for kw in SUSPICIOUS_KEYWORDS if kw in lowered)
-    brand_hits = sum(1 for brand in TARGETED_BRANDS if brand in lowered)
+
     # A brand referenced anywhere except inside the registrable domain is the
     # classic "paypal.secure-login.example.com" impersonation pattern.
     outside_domain = lowered.replace(reg_domain, " ", 1) if reg_domain else lowered
-    brand_outside = any(brand in outside_domain for brand in TARGETED_BRANDS)
+    brands_outside = _brand_matches(outside_domain)
+    brand_outside = bool(brands_outside)
+
+    # A brand token inside the brand's *own* registrable domain is the brand
+    # being itself, and must not be counted as an impersonation signal - that
+    # is what put paypal.com at 0.6532 and dropbox.com at 0.7971. The same
+    # token appearing anywhere else in the URL still counts, so
+    # "paypal.com.evil.tk" and "evil.tk/paypal/login" are unaffected.
+    brand_hits = sum(
+        1 for brand in _brand_matches(lowered)
+        if brand in brands_outside or reg_domain not in BRAND_DOMAINS.get(brand, ())
+    )
 
     tld_in_subdomain = any(tok in _COMMON_TLD_TOKENS for tok in subdomain_labels)
     tld_in_path = any(tok in _COMMON_TLD_TOKENS for tok in path_tokens)
@@ -447,6 +554,68 @@ def matched_suspicious_keywords(url: str) -> list[str]:
 
 
 def matched_brands(url: str) -> list[str]:
-    """Return which impersonation-target brand names occur in ``url``."""
+    """Return which impersonation-target brand names occur in ``url``.
+
+    Uses the same token-aware matching as the feature extractor, so the
+    evidence shown to the user and to the LLM is exactly what the model scored
+    - not a looser substring scan that would cite "ups" inside
+    ``groups.google.com``.
+
+    A brand on its own registrable domain is excluded: ``paypal.com`` is not
+    evidence of PayPal impersonation.
+    """
     lowered = normalize_url(canonicalize_for_features(url)).lower()
-    return [brand for brand in TARGETED_BRANDS if brand in lowered]
+    reg_domain = registrable_domain(split_url(url)["host"])
+    outside_domain = lowered.replace(reg_domain, " ", 1) if reg_domain else lowered
+    brands_outside = _brand_matches(outside_domain)
+    return [
+        brand for brand in TARGETED_BRANDS
+        if brand in _brand_matches(lowered)
+        and (brand in brands_outside or reg_domain not in BRAND_DOMAINS.get(brand, ()))
+    ]
+
+
+# --------------------------------------------------------------------------
+# Extractor fingerprint
+# --------------------------------------------------------------------------
+
+#: URLs whose feature vectors define the extractor's observable behaviour.
+#: Chosen to exercise the parts most likely to change: brand matching, keyword
+#: counts, host structure, IP literals, punycode, ports and escapes.
+_FINGERPRINT_PROBES: tuple[str, ...] = (
+    "https://google.com",
+    "https://paypal.com/signin",
+    "http://paypal.com.secure-login-verify.tk/webscr?cmd=_account-update",
+    "https://groups.google.com/g/some-group",
+    "http://192.168.1.10:8080/login/verify.php",
+    "https://xn--goog-sla.com/%2e%2e/admin",
+    "https://sub.deep.example.co.uk/a/b/c?x=1&y=2#frag",
+    "https://purchase-tickets.example.com/order",
+)
+
+
+def feature_fingerprint() -> str:
+    """Hash the extractor's *behaviour*, not just its feature names.
+
+    ``feature_metadata.json`` already records ``feature_names``, and the
+    predictor refuses to serve when those disagree. That check cannot see a
+    change in what a name *computes*: fixing ``num_brand_mentions`` so that
+    ``paypal.com`` no longer counts as impersonating PayPal left every name
+    identical while changing the numbers the model receives - exactly the kind
+    of silent skew that produces confidently wrong predictions.
+
+    Training records this digest; the predictor compares it at load time and
+    refuses a mismatch. Any edit to a feature's computation changes it, which
+    is the point: it forces a retrain rather than allowing a quiet skew.
+    """
+    import hashlib
+
+    digest = hashlib.sha256()
+    digest.update("|".join(FEATURE_NAMES).encode("utf-8"))
+    for url in _FINGERPRINT_PROBES:
+        features = extract_features(url)
+        # Round before hashing so that harmless floating-point noise across
+        # platforms does not invalidate an otherwise-identical extractor.
+        row = ",".join(f"{features[name]:.6f}" for name in FEATURE_NAMES)
+        digest.update(f"{url}={row}".encode("utf-8"))
+    return digest.hexdigest()[:32]

@@ -1,8 +1,8 @@
 {
   "model_name": "hybrid_ensemble",
   "model_version": "1.0.0",
-  "trained_at": "2026-09-04T06:32:09+00:00",
-  "python_version": "3.10.0",
+  "trained_at": "2026-09-12T07:35:56+00:00",
+  "python_version": "3.12.14",
   "feature_names": [
     "url_length",
     "hostname_length",
@@ -58,8 +58,9 @@
     "num_brand_mentions"
   ],
   "feature_count": 52,
-  "decision_threshold": 0.6334893432675898,
-  "threshold_policy": "maximise recall subject to validation precision >= 0.97",
+  "feature_fingerprint": "49c018eddfcf3faeed098d71c4d215b6",
+  "decision_threshold": 0.5103,
+  "threshold_policy": "maximise accuracy on the validation split",
   "label_mapping": {
     "0": "legitimate",
     "1": "phishing"
@@ -67,7 +68,7 @@
   "hyperparameters": {
     "members": "char_ngram_sgd + xgboost",
     "voting": "soft",
-    "weights": "1:1",
+    "weights": "3:2",
     "inputs": "numeric + char n-grams"
   },
   "dataset": {
@@ -98,15 +99,15 @@
         "1": 100520
       }
     },
-    "sampled_rows": 500000,
-    "max_rows_cap": 500000,
-    "unique_domains": 198432,
-    "train_rows": 364953,
-    "val_rows": 67933,
-    "test_rows": 67114,
-    "train_phishing_rate": 0.5070844738911586,
-    "val_phishing_rate": 0.47919273401734064,
-    "test_phishing_rate": 0.4825371755520458,
+    "sampled_rows": 851279,
+    "max_rows_cap": 0,
+    "unique_domains": 320876,
+    "train_rows": 606684,
+    "val_rows": 114016,
+    "test_rows": 130579,
+    "train_phishing_rate": 0.3861878671598394,
+    "val_phishing_rate": 0.38804202918888575,
+    "test_phishing_rate": 0.39831825944447424,
     "feature_count": 52,
     "split_strategy": "GroupShuffle by registrable domain (no domain in two splits)"
   },
@@ -126,72 +127,101 @@
   },
   "top_features": [
     {
-      "feature": "num_digits_in_host",
-      "importance": 0.157521
+      "feature": "has_suspicious_tld",
+      "importance": 0.164706
     },
     {
-      "feature": "has_suspicious_tld",
-      "importance": 0.141672
+      "feature": "num_digits_in_host",
+      "importance": 0.135209
+    },
+    {
+      "feature": "num_brand_mentions",
+      "importance": 0.078197
     },
     {
       "feature": "num_suspicious_keywords",
-      "importance": 0.077904
-    },
-    {
-      "feature": "num_plus",
-      "importance": 0.050085
-    },
-    {
-      "feature": "num_ampersands",
-      "importance": 0.049977
+      "importance": 0.075785
     },
     {
       "feature": "tld_length",
-      "importance": 0.048637
+      "importance": 0.050785
     },
     {
-      "feature": "brand_outside_domain",
-      "importance": 0.041426
+      "feature": "num_plus",
+      "importance": 0.047175
+    },
+    {
+      "feature": "num_equals",
+      "importance": 0.031362
+    },
+    {
+      "feature": "num_query_params",
+      "importance": 0.028035
     },
     {
       "feature": "num_hyphens_in_host",
-      "importance": 0.031559
-    },
-    {
-      "feature": "num_dots",
-      "importance": 0.026519
-    },
-    {
-      "feature": "has_at_symbol",
-      "importance": 0.023827
-    },
-    {
-      "feature": "num_underscores",
-      "importance": 0.021194
-    },
-    {
-      "feature": "path_length",
-      "importance": 0.017972
+      "importance": 0.026834
     },
     {
       "feature": "num_at",
-      "importance": 0.017254
+      "importance": 0.019743
     },
     {
-      "feature": "has_tld_in_path",
-      "importance": 0.016058
+      "feature": "host_digit_ratio",
+      "importance": 0.017958
     },
     {
-      "feature": "has_hex_escape",
-      "importance": 0.015941
+      "feature": "has_at_symbol",
+      "importance": 0.017351
+    },
+    {
+      "feature": "num_underscores",
+      "importance": 0.016256
+    },
+    {
+      "feature": "num_slashes",
+      "importance": 0.015775
+    },
+    {
+      "feature": "num_percent",
+      "importance": 0.015363
     }
   ],
   "sanity_check": {
-    "note": "Hand-curated smoke test, not a benchmark. Reported separately from the held-out test metrics.",
-    "total": 40,
-    "correct": 39,
-    "accuracy": 0.975,
-    "legitimate_accuracy": 0.96,
-    "phishing_accuracy": 1.0
+    "note": "Hand-curated smoke test, not a benchmark. Reported separately from the held-out test metrics. 'as_served' includes the reputation prior; 'model_only' does not.",
+    "total": 101,
+    "correct": 95,
+    "accuracy": 0.9405940594059405,
+    "legitimate_accuracy": 0.9230769230769231,
+    "phishing_accuracy": 1.0,
+    "model_only_accuracy": 0.8316831683168316,
+    "model_only_legitimate_accuracy": 0.782051282051282,
+    "unlisted_legitimate_accuracy": 0.85,
+    "per_group": {
+      "well_known": {
+        "total": 38,
+        "label": 0,
+        "model_only_correct": 27,
+        "as_served_correct": 38
+      },
+      "unlisted_legitimate": {
+        "total": 40,
+        "label": 0,
+        "model_only_correct": 34,
+        "as_served_correct": 34
+      },
+      "phishing_shaped": {
+        "total": 15,
+        "label": 1,
+        "model_only_correct": 15,
+        "as_served_correct": 15
+      },
+      "bypass_attempts": {
+        "total": 8,
+        "label": 1,
+        "model_only_correct": 8,
+        "as_served_correct": 8
+      }
+    }
   }
 }

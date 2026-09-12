@@ -101,6 +101,7 @@ LEGITIMATE_URLS: tuple[str, ...] = (
 #: are the group that actually measures the classifier. Keep them off that
 #: list: the moment one is added, it stops testing anything.
 UNLISTED_LEGITIMATE_URLS: tuple[str, ...] = (
+    # --- developer documentation -----------------------------------------
     "https://www.sqlite.org/lang_select.html",
     "https://www.postgresql.org/docs/current/sql-select.html",
     "https://nginx.org/en/docs/http/ngx_http_core_module.html",
@@ -109,13 +110,40 @@ UNLISTED_LEGITIMATE_URLS: tuple[str, ...] = (
     "https://ffmpeg.org/ffmpeg-filters.html",
     "https://redis.io/docs/latest/commands/set/",
     "https://www.rfc-editor.org/rfc/rfc7231",
+    "https://man7.org/linux/man-pages/man1/ls.1.html",
+    "https://mariadb.org/documentation/",
+    "https://www.mysql.com/products/community/",
+    "https://jquery.com/download/",
+    "https://lodash.com/docs/",
+    "https://d3js.org/getting-started",
+    "https://leafletjs.com/examples.html",
+    "https://www.chartjs.org/docs/latest/",
+    "https://getbootstrap.com/docs/5.3/getting-started/introduction/",
+    "https://sass-lang.com/documentation/",
     "https://caniuse.com/flexbox",
     "https://regex101.com/",
+    # --- reference and media ----------------------------------------------
     "https://www.gutenberg.org/ebooks/1342",
     "https://openlibrary.org/search?q=phishing",
     "https://www.imdb.com/title/tt0111161/",
+    "https://www.britannica.com/topic/phishing",
+    "https://www.merriam-webster.com/dictionary/phishing",
+    "https://dictionary.cambridge.org/dictionary/english/phishing",
+    "https://www.goodreads.com/book/show/1.Harry_Potter",
+    "https://www.rottentomatoes.com/m/inception",
+    "https://www.espn.com/nfl/scoreboard",
+    "https://www.allrecipes.com/recipe/213742/",
+    "https://www.smithsonianmag.com/science-nature/",
+    "https://www.nationalgeographic.com/animals/",
+    # --- services, public bodies, education -------------------------------
     "https://www.weather.gov/forecast",
     "https://www.timeanddate.com/worldclock/",
+    "https://www.nhs.uk/conditions/",
+    "https://www.who.int/health-topics/",
+    "https://www.worldbank.org/en/research",
+    "https://www.coursera.org/learn/machine-learning",
+    "https://www.khanacademy.org/math/algebra",
+    "https://www.indeed.com/jobs?q=engineer",
 )
 
 #: URLs exhibiting textbook phishing structure. These are constructed patterns

@@ -148,21 +148,49 @@ def render(metrics: dict, metadata: dict) -> str:
         add("aggregate metrics cannot detect a shortcut that is present in the test")
         add("split too.")
         add("")
-        add(f"- Overall: **{sanity['correct']}/{sanity['total']}** correct")
-        add(f"- Well-known legitimate URLs: {pct(sanity['legitimate_accuracy'], 0)}")
+        add("The set is scored in four groups, twice: once on raw model output")
+        add("(`model_only`) and once on the verdict a user actually sees (`as_served`,")
+        add("which includes the reputation prior). Both are kept, because a reputation")
+        add("list that improved the served number while the model quietly rotted would")
+        add("hide exactly the class of bug this gate was written to catch.")
+        add("")
+        groups = sanity.get("per_group", {})
+        if groups:
+            labels = {
+                "well_known": "major sites, most on the known-good list",
+                "unlisted_legitimate": "real legitimate sites deliberately **off** the list",
+                "phishing_shaped": "textbook lure structures",
+                "bypass_attempts": "attacks shaped to borrow a trusted name",
+            }
+            add("| group | what it tests | model alone | as served |")
+            add("| --- | --- | --- | --- |")
+            for name, stats in groups.items():
+                add(f"| `{name}` | {labels.get(name, '')} | "
+                    f"{stats['model_only_correct']}/{stats['total']} | "
+                    f"**{stats['as_served_correct']}/{stats['total']}** |")
+            add("")
+        add(f"- Overall as served: **{sanity['correct']}/{sanity['total']}** correct")
+        add(f"- Legitimate URLs: {pct(sanity['legitimate_accuracy'], 0)} "
+            f"(model alone {pct(sanity.get('model_only_legitimate_accuracy', 0), 0)})")
         add(f"- Phishing-shaped URLs: {pct(sanity['phishing_accuracy'], 0)}")
+        add("")
+        add("A legitimate URL only counts as correct when it reads *legitimate*.")
+        add("Landing in the suspicious band counts as a failure, because that is what")
+        add("users see and report.")
         failures = sanity.get("failures", [])
         if failures:
             add("")
             add("Current failures, reported rather than hidden:")
             add("")
+            add("| URL | model | as served |")
+            add("| --- | --- | --- |")
             for failure in failures:
-                kind = "legitimate" if failure["expected"] == 0 else "phishing"
-                add(f"- `{failure['url']}` — expected {kind}, scored {failure['probability']:.4f}")
+                add(f"| `{failure['url']}` | {failure['model_probability']:.4f} | "
+                    f"{failure['served_probability']:.4f} |")
             add("")
-            add("These are false positives on well-known sites, and they reflect a real")
-            add("limitation: the corpora's legitimate examples skew long-tail, so major")
-            add("brand domains are under-represented. See [Limitations](#limitations).")
+            add("Every one is a legitimate URL the reputation list does not cover, which")
+            add("is why they are in the set: they measure the model with nothing")
+            add("shielding it. See [Limitations](#limitations).")
         else:
             add("")
             add("No failures in the current run.")

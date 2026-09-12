@@ -166,3 +166,82 @@ class TestHelpers:
 
     def test_matched_brands_returns_evidence(self):
         assert "paypal" in matched_brands("http://paypal-verify.tk")
+
+
+class TestBrandMentions:
+    """`num_brand_mentions` must signal impersonation, not brand presence.
+
+    Two defects were measured on the shipped artifact and are fixed here:
+
+    * a brand token inside the brand's **own** registrable domain was counted,
+      so `paypal.com` scored 0.6532 and `dropbox.com` 0.7971 - above the
+      phishing threshold - for being themselves;
+    * matching was a plain substring scan, so "ups" fired on
+      `groups.google.com` and "chase" on `purchase`.
+    """
+
+    @pytest.mark.parametrize("url", [
+        "https://paypal.com",
+        "https://paypal.com/signin",
+        "https://dropbox.com",
+        "https://microsoft.com",
+        "https://netflix.com",
+        "https://instagram.com",
+        "https://google.com",
+        "https://mail.google.com",
+        "https://groups.google.com",
+        "https://icloud.com",
+        "https://x.com",
+    ])
+    def test_a_brand_on_its_own_domain_is_not_a_mention(self, url):
+        assert extract_features(url)["num_brand_mentions"] == 0.0
+        assert matched_brands(url) == []
+
+    @pytest.mark.parametrize("url,brand", [
+        ("http://paypal.com.secure-login-verify.tk/webscr", "paypal"),
+        ("http://evil.tk/paypal/login", "paypal"),
+        ("https://paypal-support.com/verify/account", "paypal"),
+        ("http://appleid-apple.com-verify-account.gq/signin", "apple"),
+        ("http://netflix-billing-update-required.xyz/account", "netflix"),
+        ("http://update-now.microsoft.security-alert.ml/login.php", "microsoft"),
+    ])
+    def test_impersonation_still_counts(self, url, brand):
+        assert extract_features(url)["num_brand_mentions"] >= 1.0
+        assert brand in matched_brands(url)
+
+    @pytest.mark.parametrize("url", [
+        "https://purchase-tickets.example.com/order",   # "chase" inside "purchase"
+        "https://startups.example.com/list",            # "ups" inside "startups"
+        "https://backups.example.org/nightly",          # "ups" inside "backups"
+    ])
+    def test_short_brands_do_not_match_inside_ordinary_words(self, url):
+        assert extract_features(url)["num_brand_mentions"] == 0.0
+
+    def test_long_brands_still_match_as_an_affix(self):
+        # No separator, so a token-equality-only rule would miss these.
+        assert "paypal" in matched_brands("https://paypalsecure.example.tk/login")
+        assert "microsoft" in matched_brands("https://securemicrosoft.example.tk/x")
+
+    def test_brand_on_its_own_domain_still_counts_when_repeated_elsewhere(self):
+        # The exemption covers the registrable domain only. A brand that also
+        # appears in the path is a real signal and must survive.
+        features = extract_features("https://paypal.com/paypal-verify/login")
+        assert features["num_brand_mentions"] >= 1.0
+
+    def test_lookalike_domain_is_not_exempt(self):
+        # paypa1 (digit one) is not paypal and is not on any exemption list.
+        assert extract_features("https://paypa1.com/verify")["num_brand_mentions"] == 0.0
+        # ...but the brand token in a hyphenated lookalike is caught.
+        assert "paypal" in matched_brands("https://paypal-secure.com/verify")
+
+    def test_every_brand_domain_key_is_a_targeted_brand(self):
+        from ml.features import BRAND_DOMAINS, TARGETED_BRANDS
+
+        assert set(BRAND_DOMAINS) <= set(TARGETED_BRANDS)
+
+    def test_every_brand_domain_value_is_a_registrable_domain(self):
+        from ml.features import BRAND_DOMAINS, registrable_domain
+
+        for brand, domains in BRAND_DOMAINS.items():
+            for domain in domains:
+                assert registrable_domain(domain) == domain, f"{brand}: {domain}"
