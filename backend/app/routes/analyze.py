@@ -17,10 +17,17 @@ from backend.app.schemas.analysis import (
     BatchAnalysisResponse,
     BatchAnalyzeRequest,
     ErrorResponse,
+    Severity,
+    SuspiciousIndicator,
 )
 from backend.app.services import feature_extractor
 from backend.app.services.llm_analyzer import llm_analyzer
-from backend.app.services.predictor import interpret, predictor, verdict_threshold
+from backend.app.services.predictor import (
+    apply_reputation,
+    interpret,
+    predictor,
+    verdict_threshold,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -50,10 +57,28 @@ async def analyze_url(request: AnalyzeRequest) -> AnalysisResponse:
     normalized, components = feature_extractor.validate_url(request.url)
     features = feature_extractor.extract(normalized)
 
-    probability = predictor.predict_one(features, normalized)
+    model_probability = predictor.predict_one(features, normalized)
+    probability, reputation_domain = apply_reputation(model_probability, normalized)
     prediction, risk_level, risk_score, confidence = interpret(probability, verdict_threshold())
 
     indicators = feature_extractor.build_suspicious_indicators(normalized, features, components)
+    if reputation_domain is not None:
+        # Surfaced rather than applied silently: the user is told the score was
+        # lowered, by which rule, and what the model said on its own.
+        indicators.insert(0, SuspiciousIndicator(
+            code="known_good_domain",
+            title="Recognised domain",
+            description=(
+                f"'{reputation_domain}' is on PhishGuard's curated list of known-good "
+                f"registrable domains, so the risk score was capped. The classifier "
+                f"alone scored this URL {model_probability:.2f}; bare well-known "
+                f"domains carry little lexical signal and sit near the model's prior. "
+                f"Only an exact registrable-domain match counts - look-alikes and "
+                f"subdomains of this brand on other domains are not covered."
+            ),
+            severity=Severity.INFO,
+            evidence=reputation_domain,
+        ))
     highlights = feature_extractor.build_feature_highlights(features, components)
 
     # The LLM is called only after the ML verdict exists, and only for the
@@ -74,8 +99,9 @@ async def analyze_url(request: AnalyzeRequest) -> AnalysisResponse:
 
     elapsed_ms = int((time.perf_counter() - started) * 1000)
     logger.info(
-        "Analyzed %s -> %s (p=%.4f, %d ms, explanation=%s)",
-        redact_url(normalized), prediction.value, probability,
+        "Analyzed %s -> %s (p=%.4f, model=%.4f%s, %d ms, explanation=%s)",
+        redact_url(normalized), prediction.value, probability, model_probability,
+        f", known-good={reputation_domain}" if reputation_domain else "",
         elapsed_ms, explanation.source.value,
     )
 
@@ -86,6 +112,8 @@ async def analyze_url(request: AnalyzeRequest) -> AnalysisResponse:
         risk_level=risk_level,
         confidence=round(confidence, 4),
         phishing_probability=round(probability, 4),
+        model_probability=round(model_probability, 4),
+        reputation_domain=reputation_domain,
         risk_score=risk_score,
         components=components,
         features={k: round(float(v), 6) for k, v in features.items()},
@@ -131,10 +159,11 @@ async def batch_analyze(request: BatchAnalyzeRequest) -> BatchAnalysisResponse:
             [features for _, features, _ in valid],
             [url for _, _, url in valid],
         )
-        for (index, _, _), probability in zip(valid, probabilities, strict=True):
-            prediction, risk_level, risk_score, confidence = interpret(
-                float(probability), threshold
-            )
+        for (index, _, url), probability in zip(valid, probabilities, strict=True):
+            # The same reputation prior as /analyze - a URL must never get a
+            # different verdict for having arrived in a batch.
+            adjusted, _domain = apply_reputation(float(probability), url)
+            prediction, risk_level, risk_score, confidence = interpret(adjusted, threshold)
             results[index] = BatchAnalysisItem(
                 url=request.urls[index],
                 prediction=prediction,
@@ -195,6 +224,8 @@ async def agent_analyze(request: AnalyzeRequest) -> AnalysisResponse:
         risk_level=state["risk_level"],
         confidence=round(state["confidence"], 4),
         phishing_probability=round(state["probability"], 4),
+        model_probability=round(state.get("model_probability", state["probability"]), 4),
+        reputation_domain=state.get("reputation_domain"),
         risk_score=state["risk_score"],
         components=state["components"],
         features={k: round(float(v), 6) for k, v in features.items()},

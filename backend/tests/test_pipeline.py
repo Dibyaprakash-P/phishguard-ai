@@ -188,3 +188,73 @@ class TestSanitySet:
         assert any(not u.replace("https://", "").startswith("www.") for u in legit)
         assert any(u.count("/") <= 2 for u in legit)   # bare homepages
         assert any(u.count("/") > 3 for u in legit)    # deep paths
+
+    def test_unlisted_legitimate_urls_are_really_unlisted(self):
+        """The group that measures the model must not be shielded by the list.
+
+        ``UNLISTED_LEGITIMATE_URLS`` exists so the sanity gate keeps one set of
+        legitimate URLs that the reputation prior cannot touch. If someone adds
+        one of those domains to ``KNOWN_GOOD_DOMAINS``, the group silently stops
+        testing anything - so assert it here rather than discovering it later.
+        """
+        from ml.reputation import known_good_domain
+        from ml.sanity_urls import UNLISTED_LEGITIMATE_URLS
+
+        shielded = [u for u in UNLISTED_LEGITIMATE_URLS if known_good_domain(u)]
+        assert not shielded, f"now covered by the known-good list: {shielded}"
+
+    def test_bypass_urls_are_never_known_good(self):
+        """Each bypass case targets one guard in ml.reputation."""
+        from ml.reputation import known_good_domain
+        from ml.sanity_urls import BYPASS_URLS
+
+        admitted = [u for u in BYPASS_URLS if known_good_domain(u)]
+        assert not admitted, f"reputation prior admitted an attack: {admitted}"
+
+
+class TestThresholdConfigAgreement:
+    """Training and serving must interpret the same probability identically.
+
+    These constants live in two places - ``ml/config.py`` for the training-time
+    sanity gate and ``backend/app/core/config.py`` for the API. They had drifted
+    (0.40 vs 0.48), which meant the post-training gate was scoring a suspicious
+    band the API never served, and the gate passed while the product showed
+    well-known sites as suspicious.
+    """
+
+    def test_suspicious_threshold_matches(self):
+        from backend.app.core.config import settings
+        from ml import config as ml_config
+
+        assert ml_config.SUSPICIOUS_THRESHOLD == settings.suspicious_threshold
+
+    def test_phishing_threshold_matches(self):
+        from backend.app.core.config import settings
+        from ml import config as ml_config
+
+        assert ml_config.PHISHING_THRESHOLD == settings.phishing_threshold
+
+    def test_reputation_ceiling_matches(self):
+        from backend.app.core.config import settings
+        from ml import config as ml_config
+
+        assert ml_config.REPUTATION_CEILING == settings.reputation_ceiling
+
+    def test_risk_bands_match(self):
+        from backend.app.core.config import settings
+        from ml import config as ml_config
+
+        assert ml_config.RISK_LOW_MAX == settings.risk_low_max
+        assert ml_config.RISK_MEDIUM_MAX == settings.risk_medium_max
+
+    def test_reputation_ceiling_lands_in_the_low_risk_band(self):
+        """A clamped URL must read low-risk, not merely under the band edge.
+
+        google.com scored 0.4466 before the prior: "legitimate", but risk score
+        45, which crosses risk_low_max into MEDIUM and paints the card amber.
+        That is the false positive users actually reported seeing.
+        """
+        from backend.app.core.config import settings
+
+        assert settings.reputation_ceiling * 100 <= settings.risk_low_max
+        assert settings.reputation_ceiling < settings.suspicious_threshold

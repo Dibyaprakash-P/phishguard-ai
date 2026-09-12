@@ -115,6 +115,21 @@ class Settings(BaseSettings):
     risk_low_max: int = 30
     risk_medium_max: int = 70
 
+    #: Ceiling applied to P(phishing) when the URL's registrable domain is on
+    #: the curated known-good list (``ml/reputation.py``). A URL-only model has
+    #: almost nothing to read in a bare domain, so well-known sites sit near its
+    #: prior: measured on the shipped artifact, 15 of 52 hand-picked legitimate
+    #: URLs were not reported as legitimate, including paypal.com (0.653) and
+    #: dropbox.com (0.797) above the phishing threshold.
+    #:
+    #: 0.25 sits inside the LOW risk band, so a match reads "legitimate" with a
+    #: low score rather than merely scraping under the suspicious boundary. The
+    #: clamp is a floor on trust, never a raise: a known-good domain already
+    #: scoring below the ceiling keeps its lower score.
+    #:
+    #: Set to 1.0 to disable the reputation prior and serve raw model output.
+    reputation_ceiling: float = 0.25
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def _split_origins(cls, value: object) -> object:

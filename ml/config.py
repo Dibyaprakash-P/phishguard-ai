@@ -55,8 +55,19 @@ LABEL_PHISHING: int = 1
 
 #: Probability thresholds mapping model output -> UI verdict.
 #: These are product decisions, not universal scientific constants.
-SUSPICIOUS_THRESHOLD: float = 0.40
+#:
+#: These values must stay equal to their counterparts in
+#: ``backend/app/core/config.py``, which carries the measurements behind each
+#: number. They had silently drifted (0.40 here, 0.48 there), so the sanity
+#: gate was scoring a band the API does not serve; ``backend/tests/
+#: test_pipeline.py`` now asserts they agree.
+SUSPICIOUS_THRESHOLD: float = 0.48
 PHISHING_THRESHOLD: float = 0.70
+
+#: Ceiling applied to P(phishing) for URLs on the curated known-good list in
+#: ``ml/reputation.py``. See the matching setting in the backend config for
+#: the rationale and the measurements.
+REPUTATION_CEILING: float = 0.25
 
 #: Risk-score bands (0-100).
 RISK_LOW_MAX: int = 30

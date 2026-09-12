@@ -23,6 +23,7 @@ from backend.app.core.exceptions import ModelNotAvailableError, PredictionError
 from backend.app.schemas.analysis import Prediction, RiskLevel
 from ml.features import FEATURE_NAMES, canonicalize_for_features
 from ml.preprocess import MODEL_URL_COLUMN
+from ml.reputation import known_good_domain
 
 logger = logging.getLogger(__name__)
 
@@ -164,6 +165,35 @@ class PhishingPredictor:
     def predict_one(self, features: dict[str, float], url: str) -> float:
         """Return P(phishing) for a single URL."""
         return float(self.predict_proba([features], [url])[0])
+
+
+# --------------------------------------------------------------------------
+# Reputation prior
+# --------------------------------------------------------------------------
+
+def apply_reputation(probability: float, url: str) -> tuple[float, str | None]:
+    """Clamp ``probability`` for URLs served from a known-good registrable domain.
+
+    Returns ``(probability, matched_domain)``; ``matched_domain`` is ``None``
+    when no reputation rule applied, which is the case for every URL off the
+    curated list in :mod:`ml.reputation`.
+
+    The clamp is one-directional - ``min`` of the model output and the ceiling -
+    so reputation can only ever lower a score, never raise one. A known-good
+    domain the model already scored confidently legitimate keeps that lower
+    number rather than being pulled up to the ceiling.
+
+    This exists because a URL-only classifier cannot read a bare domain: there
+    is no lure vocabulary, no depth, no entropy to score, so the model returns
+    something near its prior and well-known sites land mid-band. See
+    :mod:`ml.reputation` for the measurements and the bypass guards.
+    """
+    if settings.reputation_ceiling >= 1.0:
+        return probability, None
+    domain = known_good_domain(url)
+    if domain is None:
+        return probability, None
+    return min(probability, settings.reputation_ceiling), domain
 
 
 # --------------------------------------------------------------------------

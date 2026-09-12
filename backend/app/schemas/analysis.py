@@ -159,8 +159,25 @@ class AnalysisResponse(BaseModel):
     risk_level: RiskLevel
     confidence: float = Field(..., ge=0.0, le=1.0,
                               description="Model confidence in the reported verdict.")
-    phishing_probability: float = Field(..., ge=0.0, le=1.0,
-                                        description="Raw P(phishing) from the classifier.")
+    phishing_probability: float = Field(
+        ..., ge=0.0, le=1.0,
+        description=(
+            "P(phishing) the verdict was derived from. Equal to "
+            "`model_probability` unless a reputation rule applied."
+        ),
+    )
+    model_probability: float = Field(
+        ..., ge=0.0, le=1.0,
+        description="Raw P(phishing) from the classifier, before any reputation rule.",
+    )
+    reputation_domain: str | None = Field(
+        None,
+        description=(
+            "Registrable domain matched on the curated known-good list, or null. "
+            "When set, the score was clamped and the difference from "
+            "`model_probability` is attributable to that rule alone."
+        ),
+    )
     risk_score: int = Field(..., ge=0, le=100,
                             description="Model-derived risk indicator, not a universal standard.")
     components: URLComponents

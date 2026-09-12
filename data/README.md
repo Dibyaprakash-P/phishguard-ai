@@ -22,6 +22,33 @@ data/raw/          <- alternative
 Only the files that are present are used. A missing dataset is logged and
 skipped, so the pipeline still runs with a subset.
 
+### Fetching them
+
+Two of the four need no account:
+
+```bash
+mkdir -p datasets
+
+# PhiUSIIL (UCI) - ~235k rows
+curl -sSL -o datasets/phiusiil.zip "https://archive.ics.uci.edu/static/public/967/phiusiil+phishing+url+dataset.zip"
+python -c "import zipfile; zipfile.ZipFile('datasets/phiusiil.zip').extractall('datasets')"
+rm datasets/phiusiil.zip
+
+# Hannousse & Yahiouche (Mendeley) - 11,430 rows, balanced
+curl -sSL -o datasets/dataset_phishing.csv "https://data.mendeley.com/public-files/datasets/c2gw7fy2j4/files/575316f4-ee1d-453e-a04f-7b950915b61b/file_downloaded"
+```
+
+The two Kaggle corpora need an account. Put a `kaggle.json` API token in
+`~/.kaggle/` and run:
+
+```bash
+pip install kaggle
+kaggle datasets download -d sid321axn/malicious-urls-dataset -p datasets --unzip
+kaggle datasets download -d taruntiwarihp/phishing-site-urls -p datasets --unzip
+```
+
+**`malicious_phish.csv` is not optional in practice.** See the warning below.
+
 ---
 
 ## Expected files
@@ -142,6 +169,30 @@ PhishGuard therefore splits on the **registrable domain**: every host in the
 validation and test splits is one the model has never seen. `ml/preprocess.py`
 asserts the split intersections are empty, and `backend/tests/test_pipeline.py`
 tests it.
+
+### Why `malicious_phish.csv` is effectively required
+
+Measured over the corpora as loaded, on the canonical URL form:
+
+| source | label | no path | has path |
+| --- | --- | --- | --- |
+| PhiUSIIL | legitimate | **100.00%** | 0.00% |
+| PhiUSIIL | phishing | 40.14% | 59.86% |
+| dataset_phishing | legitimate | 6.16% | 93.84% |
+| dataset_phishing | phishing | 5.02% | 94.98% |
+
+Every single legitimate URL in PhiUSIIL is path-less. Train on PhiUSIIL as the
+bulk of the corpus and "has a path" becomes a near-free phishing signal worth
+60% of its positive class — which reports as *high accuracy* while making the
+model worse at the thing it exists to do. `malicious_phish.csv` contributes
+~380k benign URLs that all have paths, and it is what breaks that correlation.
+
+`dataset_phishing.csv` is balanced on this axis but is only 11k rows, far too
+small to counterweight 236k on its own.
+
+If you train without `malicious_phish.csv`, treat the resulting accuracy as
+unvalidated and watch the `unlisted_legitimate` sanity group, which is where
+this artefact shows up first.
 
 This lowers the reported scores considerably compared with a random split —
 that is the point. The numbers mean something.

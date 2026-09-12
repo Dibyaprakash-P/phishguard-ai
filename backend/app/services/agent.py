@@ -36,7 +36,12 @@ from backend.app.schemas.analysis import (
 )
 from backend.app.services import feature_extractor
 from backend.app.services.llm_analyzer import llm_analyzer
-from backend.app.services.predictor import interpret, predictor, verdict_threshold
+from backend.app.services.predictor import (
+    apply_reputation,
+    interpret,
+    predictor,
+    verdict_threshold,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +54,8 @@ class AnalysisState(TypedDict, total=False):
     components: URLComponents
     features: dict[str, float]
     probability: float
+    model_probability: float
+    reputation_domain: str | None
     prediction: Prediction
     risk_level: RiskLevel
     risk_score: int
@@ -83,10 +90,17 @@ def _node_extract(state: AnalysisState) -> AnalysisState:
 
 def _node_predict(state: AnalysisState) -> AnalysisState:
     """Run the trained classifier. This node, and only this node, decides."""
-    probability = predictor.predict_one(state["features"], state["normalized_url"])
+    model_probability = predictor.predict_one(state["features"], state["normalized_url"])
+    # Same reputation prior as the REST path, so the agent can never reach a
+    # different verdict on the same URL.
+    probability, reputation_domain = apply_reputation(
+        model_probability, state["normalized_url"]
+    )
     prediction, risk_level, risk_score, confidence = interpret(probability, verdict_threshold())
     return {
         "probability": probability,
+        "model_probability": model_probability,
+        "reputation_domain": reputation_domain,
         "prediction": prediction,
         "risk_level": risk_level,
         "risk_score": risk_score,

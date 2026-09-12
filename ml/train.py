@@ -53,7 +53,8 @@ from ml.preprocess import (
     prepare_dataset,
     prepare_holdout,
 )
-from ml.sanity_urls import sanity_cases
+from ml.reputation import known_good_domain
+from ml.sanity_urls import sanity_groups
 
 logger = logging.getLogger(__name__)
 
@@ -466,48 +467,120 @@ def sanity_check(model: Any, threshold: float) -> dict[str, Any]:
     This gate exists because aggregate test metrics cannot detect a shortcut
     that is present in the test split as well. It is reported separately from
     the real metrics and must never be quoted as model accuracy.
+
+    Two scores are produced for every case, and both are kept:
+
+    ``model_only``
+        the raw classifier verdict, with no reputation prior. This is the
+        honest read on the model, and the number the artefact gate watches.
+
+    ``as_served``
+        the verdict a user actually sees, after :func:`ml.reputation.
+        known_good_domain` clamps scores on curated known-good domains.
+
+    Keeping both is the whole point. A reputation list that improved
+    ``as_served`` while ``model_only`` quietly rotted would hide exactly the
+    class of bug this gate was written to catch, so the two are reported side
+    by side and :data:`ml.sanity_urls.UNLISTED_LEGITIMATE_URLS` is scored
+    where no reputation rule can reach it.
     """
-    cases = sanity_cases()
-    urls = [url for url, _ in cases]
-    labels = np.array([label for _, label in cases])
+    groups = sanity_groups()
+    urls = [url for urls_, _ in groups.values() for url in urls_]
+    labels = np.array([label for urls_, label in groups.values() for _ in urls_])
 
     proba = model.predict_proba(build_model_frame(pd.Series(urls)))[:, 1]
-    predicted = (proba >= threshold).astype(int)
-    correct = predicted == labels
+    served = np.array([
+        min(p, config.REPUTATION_CEILING) if known_good_domain(u) else p
+        for u, p in zip(urls, proba, strict=True)
+    ])
+
+    def verdicts(scores: np.ndarray) -> np.ndarray:
+        """Three-way display verdict: 0 legitimate, 1 suspicious, 2 phishing."""
+        return np.where(
+            scores >= threshold, 2,
+            np.where(scores >= min(config.SUSPICIOUS_THRESHOLD, threshold), 1, 0),
+        )
+
+    # A legitimate URL is only "correct" when it reads *legitimate* - landing in
+    # the suspicious band is the failure the user reported, so it counts as one.
+    model_ok = np.where(labels == 0, verdicts(proba) == 0, proba >= threshold)
+    served_ok = np.where(labels == 0, verdicts(served) == 0, served >= threshold)
+
+    per_group: dict[str, Any] = {}
+    offset = 0
+    for name, (urls_, label) in groups.items():
+        end = offset + len(urls_)
+        per_group[name] = {
+            "total": len(urls_),
+            "label": label,
+            "model_only_correct": int(model_ok[offset:end].sum()),
+            "as_served_correct": int(served_ok[offset:end].sum()),
+        }
+        offset = end
 
     failures = [
-        {"url": url, "expected": int(label), "probability": round(float(p), 4)}
-        for url, label, p, ok in zip(urls, labels, proba, correct, strict=True)
+        {
+            "url": url,
+            "expected": int(label),
+            "model_probability": round(float(p), 4),
+            "served_probability": round(float(s), 4),
+        }
+        for url, label, p, s, ok in zip(urls, labels, proba, served, served_ok, strict=True)
         if not ok
     ]
 
     legit_mask = labels == 0
+    unlisted = per_group["unlisted_legitimate"]
     result = {
         "note": (
             "Hand-curated smoke test, not a benchmark. Reported separately from "
-            "the held-out test metrics."
+            "the held-out test metrics. 'as_served' includes the reputation prior; "
+            "'model_only' does not."
         ),
-        "total": len(cases),
-        "correct": int(correct.sum()),
-        "accuracy": float(correct.mean()),
-        "legitimate_accuracy": float(correct[legit_mask].mean()),
-        "phishing_accuracy": float(correct[~legit_mask].mean()),
+        "total": len(urls),
+        "correct": int(served_ok.sum()),
+        "accuracy": float(served_ok.mean()),
+        "legitimate_accuracy": float(served_ok[legit_mask].mean()),
+        "phishing_accuracy": float(served_ok[~legit_mask].mean()),
+        "model_only_accuracy": float(model_ok.mean()),
+        "model_only_legitimate_accuracy": float(model_ok[legit_mask].mean()),
+        "unlisted_legitimate_accuracy": (
+            unlisted["model_only_correct"] / unlisted["total"]
+        ),
+        "per_group": per_group,
         "failures": failures,
     }
 
     logger.info(
-        "Sanity check: %d/%d correct (legit %.0f%%, phishing %.0f%%)",
+        "Sanity check: %d/%d as served (legit %.0f%%, phishing %.0f%%) | "
+        "model alone %d/%d (legit %.0f%%)",
         result["correct"], result["total"],
         result["legitimate_accuracy"] * 100, result["phishing_accuracy"] * 100,
+        int(model_ok.sum()), result["total"],
+        result["model_only_legitimate_accuracy"] * 100,
     )
+    for name, stats in per_group.items():
+        logger.info("  %-22s model %d/%d, served %d/%d", name,
+                    stats["model_only_correct"], stats["total"],
+                    stats["as_served_correct"], stats["total"])
     for failure in failures:
-        logger.warning("  SANITY FAIL expected=%s p=%.4f %s",
-                       failure["expected"], failure["probability"], failure["url"])
-    if result["legitimate_accuracy"] < 0.8:
+        logger.warning("  SANITY FAIL expected=%s model=%.4f served=%.4f %s",
+                       failure["expected"], failure["model_probability"],
+                       failure["served_probability"], failure["url"])
+
+    if per_group["bypass_attempts"]["as_served_correct"] < per_group["bypass_attempts"]["total"]:
         logger.error(
-            "Sanity gate FAILED on well-known legitimate URLs. This usually means the "
-            "model has latched onto a dataset collection artefact rather than phishing "
-            "semantics - do not ship this artifact."
+            "Sanity gate FAILED on bypass attempts: a URL shaped to borrow a trusted "
+            "name was reported legitimate. The reputation prior has become a bypass - "
+            "do not ship this artifact."
+        )
+    if result["unlisted_legitimate_accuracy"] < 0.8:
+        logger.error(
+            "Sanity gate FAILED on legitimate URLs that the reputation list does not "
+            "cover. This usually means the model has latched onto a dataset collection "
+            "artefact rather than phishing semantics - do not ship this artifact. The "
+            "reputation prior cannot mask this: those URLs are deliberately not on the "
+            "known-good list."
         )
     return result
 

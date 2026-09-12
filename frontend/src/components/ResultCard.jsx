@@ -166,7 +166,14 @@ export default function ResultCard({ result }) {
           icon={Fingerprint}
           label="P(phishing)"
           value={percent(result.phishing_probability, 2)}
-          sub={`threshold ${result.decision_threshold?.toFixed(3) ?? '—'}`}
+          sub={
+            // When a reputation rule capped the score, say so and show what the
+            // classifier said alone — a displayed probability that quietly
+            // differs from the model's would be the dishonest option.
+            result.reputation_domain
+              ? `capped · model alone ${percent(result.model_probability, 2)}`
+              : `threshold ${result.decision_threshold?.toFixed(3) ?? '—'}`
+          }
         />
         <Metric
           icon={Globe}
