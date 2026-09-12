@@ -617,5 +617,5 @@ def feature_fingerprint() -> str:
         # Round before hashing so that harmless floating-point noise across
         # platforms does not invalidate an otherwise-identical extractor.
         row = ",".join(f"{features[name]:.6f}" for name in FEATURE_NAMES)
-        digest.update(f"{url}={row}".encode("utf-8"))
+        digest.update(f"{url}={row}".encode())
     return digest.hexdigest()[:32]
